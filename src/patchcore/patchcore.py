@@ -12,7 +12,7 @@ import patchcore
 import patchcore.backbones
 import patchcore.common
 import patchcore.sampler
-
+import time
 LOGGER = logging.getLogger(__name__)
 
 
@@ -188,16 +188,21 @@ class PatchCore(torch.nn.Module):
         masks = []
         labels_gt = []
         masks_gt = []
-        with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
+        tm = []
+        with tqdm.tqdm(dataloader, desc="Inferring...", leave=True) as data_iterator:
             for image in data_iterator:
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
+                start_time= time.time()
                 _scores, _masks = self._predict(image)
+                end_time = time.time()
+                tm.append(end_time - start_time)
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
                     masks.append(mask)
+        print(f"average time per pic: {sum(tm) / len(tm)}")
         return scores, masks, labels_gt, masks_gt
 
     def _predict(self, images):

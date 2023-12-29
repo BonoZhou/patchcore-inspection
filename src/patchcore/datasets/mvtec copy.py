@@ -95,11 +95,8 @@ class MVTecDataset(torch.utils.data.Dataset):
         image = self.transform_img(image)
 
         if self.split == DatasetSplit.TEST and mask_path is not None:
-            try:
-                mask = PIL.Image.open(mask_path)
-                mask = self.transform_mask(mask)
-            except:
-                mask = torch.zeros([1, *image.size()[1:]])    
+            mask = PIL.Image.open(mask_path)
+            mask = self.transform_mask(mask)
         else:
             mask = torch.zeros([1, *image.size()[1:]])
 
@@ -148,14 +145,11 @@ class MVTecDataset(torch.utils.data.Dataset):
                         ][anomaly][train_val_split_idx:]
 
                 if self.split == DatasetSplit.TEST and anomaly != "good":
-                    try:
-                        anomaly_mask_path = os.path.join(maskpath, anomaly)
-                        anomaly_mask_files = sorted(os.listdir(anomaly_mask_path))
-                        maskpaths_per_class[classname][anomaly] = [
-                            os.path.join(anomaly_mask_path, x) for x in anomaly_mask_files
-                        ]
-                    except:
-                        maskpaths_per_class[classname][anomaly] = None
+                    anomaly_mask_path = os.path.join(maskpath, anomaly)
+                    anomaly_mask_files = sorted(os.listdir(anomaly_mask_path))
+                    maskpaths_per_class[classname][anomaly] = [
+                        os.path.join(anomaly_mask_path, x) for x in anomaly_mask_files
+                    ]
                 else:
                     maskpaths_per_class[classname]["good"] = None
 
@@ -166,10 +160,7 @@ class MVTecDataset(torch.utils.data.Dataset):
                 for i, image_path in enumerate(imgpaths_per_class[classname][anomaly]):
                     data_tuple = [classname, anomaly, image_path]
                     if self.split == DatasetSplit.TEST and anomaly != "good":
-                        if maskpaths_per_class[classname][anomaly] is not None:
-                            data_tuple.append(maskpaths_per_class[classname][anomaly][i])
-                        else:
-                            data_tuple.append(None)
+                        data_tuple.append(maskpaths_per_class[classname][anomaly][i])
                     else:
                         data_tuple.append(None)
                     data_to_iterate.append(data_tuple)

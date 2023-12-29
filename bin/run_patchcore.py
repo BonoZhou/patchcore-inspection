@@ -174,27 +174,32 @@ def run(
                 )
 
             LOGGER.info("Computing evaluation metrics.")
-            auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
+            
+            met = patchcore.metrics.compute_imagewise_retrieval_metrics(
                 scores, anomaly_labels
-            )["auroc"]
-
-            # Compute PRO score & PW Auroc for all images
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                segmentations, masks_gt
             )
-            full_pixel_auroc = pixel_scores["auroc"]
+            auroc = met["auroc"]
+            
+            try:#不存在mask的情况，pixelwise的auroc设置为-1
+                # Compute PRO score & PW Auroc for all images
+                pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+                    segmentations, masks_gt
+                )
+                full_pixel_auroc = pixel_scores["auroc"]
 
-            # Compute PRO score & PW Auroc only images with anomalies
-            sel_idxs = []
-            for i in range(len(masks_gt)):
-                if np.sum(masks_gt[i]) > 0:
-                    sel_idxs.append(i)
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                [segmentations[i] for i in sel_idxs],
-                [masks_gt[i] for i in sel_idxs],
-            )
-            anomaly_pixel_auroc = pixel_scores["auroc"]
-
+                # Compute PRO score & PW Auroc only images with anomalies
+                sel_idxs = []
+                for i in range(len(masks_gt)):
+                    if np.sum(masks_gt[i]) > 0:
+                        sel_idxs.append(i)
+                pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+                    [segmentations[i] for i in sel_idxs],
+                    [masks_gt[i] for i in sel_idxs],
+                )
+                anomaly_pixel_auroc = pixel_scores["auroc"]
+            except:
+                full_pixel_auroc = -1
+                anomaly_pixel_auroc = -1    
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
@@ -239,8 +244,8 @@ def run(
 
 @main.command("patch_core")
 # Pretraining-specific parameters.
-@click.option("--backbone_names", "-b", type=str, multiple=True, default=[])
-@click.option("--layers_to_extract_from", "-le", type=str, multiple=True, default=[])
+@click.option("--backbone_names", "-b", type=str, multiple=True, default=["wideresnet50"])
+@click.option("--layers_to_extract_from", "-le", type=str, multiple=True, default=["layer2","layer3"])
 # Parameters for Glue-code (to merge different parts of the pipeline.
 @click.option("--pretrain_embed_dimension", type=int, default=1024)
 @click.option("--target_embed_dimension", type=int, default=1024)
@@ -254,7 +259,7 @@ def run(
 @click.option("--patchoverlap", type=float, default=0.0)
 @click.option("--patchsize_aggregate", "-pa", type=int, multiple=True, default=[])
 # NN on GPU.
-@click.option("--faiss_on_gpu", is_flag=True)
+@click.option("--faiss_on_gpu", is_flag=True, default=True)
 @click.option("--faiss_num_workers", type=int, default=8)
 def patch_core(
     backbone_names,
@@ -337,8 +342,8 @@ def sampler(name, percentage):
 @click.option("--train_val_split", type=float, default=1, show_default=True)
 @click.option("--batch_size", default=2, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
-@click.option("--resize", default=256, type=int, show_default=True)
-@click.option("--imagesize", default=224, type=int, show_default=True)
+@click.option("--resize", default=[256,256], type=int, multiple=True, show_default=True)
+@click.option("--imagesize", default=[224,224], type=int, multiple=True, show_default=True)
 @click.option("--augment", is_flag=True)
 def dataset(
     name,
