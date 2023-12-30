@@ -2,6 +2,7 @@ import contextlib
 import logging
 import os
 import sys
+import csv
 
 import click
 import numpy as np
@@ -228,6 +229,18 @@ def run(
                     )
                     PatchCore.save_to_path(patchcore_save_path, prepend)
 
+        #logger.csv
+        if not isinstance(met['auroc'], list):
+            met['auroc'] = [met['auroc']]
+        max_len = max(len(lst) for lst in met.values())
+
+        with open(patchcore_save_path+'logfile.csv', 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=met.keys())
+            writer.writeheader()
+            
+            for i in range(max_len):
+                row = {key: (value[i] if i < len(value) else '') for key, value in met.items()}
+                writer.writerow(row)
         LOGGER.info("\n\n-----\n")
 
     # Store all results and mean scores to a csv-file.
@@ -342,8 +355,8 @@ def sampler(name, percentage):
 @click.option("--train_val_split", type=float, default=1, show_default=True)
 @click.option("--batch_size", default=2, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
-@click.option("--resize", default=[256,256], type=int, multiple=True, show_default=True)
-@click.option("--imagesize", default=[224,224], type=int, multiple=True, show_default=True)
+@click.option("--resize", default="256,256", type=str, show_default=True)
+@click.option("--imagesize", default="", type=str, multiple=True, show_default=True)
 @click.option("--augment", is_flag=True)
 def dataset(
     name,
@@ -365,9 +378,9 @@ def dataset(
             train_dataset = dataset_library.__dict__[dataset_info[1]](
                 data_path,
                 classname=subdataset,
-                resize=resize,
+                resize = [int(x) for x in resize.split(',')],
                 train_val_split=train_val_split,
-                imagesize=imagesize,
+                imagesize=[int(x) for x in imagesize.split(',')],
                 split=dataset_library.DatasetSplit.TRAIN,
                 seed=seed,
                 augment=augment,
@@ -376,8 +389,8 @@ def dataset(
             test_dataset = dataset_library.__dict__[dataset_info[1]](
                 data_path,
                 classname=subdataset,
-                resize=resize,
-                imagesize=imagesize,
+                resize=[int(x) for x in resize.split(',')],
+                imagesize=[int(x) for x in imagesize.split(',')],
                 split=dataset_library.DatasetSplit.TEST,
                 seed=seed,
             )
@@ -406,9 +419,9 @@ def dataset(
                 val_dataset = dataset_library.__dict__[dataset_info[1]](
                     data_path,
                     classname=subdataset,
-                    resize=resize,
+                    resize=[int(x) for x in resize.split(',')],
                     train_val_split=train_val_split,
-                    imagesize=imagesize,
+                    imagesize=[int(x) for x in imagesize.split(',')],
                     split=dataset_library.DatasetSplit.VAL,
                     seed=seed,
                 )
