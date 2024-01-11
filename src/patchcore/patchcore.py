@@ -77,6 +77,14 @@ class PatchCore(torch.nn.Module):
 
         self.featuresampler = featuresampler
         self.features = None
+        self.time = {'embed_feature_aggregator':[],
+                     'embed_preprocessing':[],
+                     'embed_preadapt_aggregator':[],
+                     'embed_reshape':[],
+                     'embed':[],
+                     'predict_process':[],
+                     'embed_all':[]} # time calculate
+
 
     def embed(self, data):
         if isinstance(data, torch.utils.data.DataLoader):
@@ -92,16 +100,20 @@ class PatchCore(torch.nn.Module):
 
     def _embed(self, images, detach=True, provide_patch_shapes=False):
         """Returns feature embeddings for images."""
-
+        allstart = time.time()
         def _detach(features):
             if detach:
                 return [x.detach().cpu().numpy() for x in features]
             return features
 
+
+        start = time.time()
         _ = self.forward_modules["feature_aggregator"].eval()
         with torch.no_grad():
             features = self.forward_modules["feature_aggregator"](images)
+        self.time['embed_feature_aggregator'].append(time.time()-start)
 
+        start = time.time()
         features = [features[layer] for layer in self.layers_to_extract_from] # 'layer2', 'layer3'
         # print(features[0].shape,features[1].shape)
         # [2, 512, 28, 28] [2, 1024, 14, 14]
@@ -144,10 +156,18 @@ class PatchCore(torch.nn.Module):
         # print(features[0].shape,features[1].shape) torch.Size([1568, 512, 3, 3]) torch.Size([1568, 1024, 3, 3])
         # As different feature backbones & patching provide differently
         # sized features, these are brought into the correct form here.
+        self.time['embed_reshape'].append(time.time()-start)
+
+        #time calculate
+        start = time.time()
         features = self.forward_modules["preprocessing"](features)
+        self.time['embed_preprocessing'].append(time.time()-start)
         # print(features.shape)[1568, 2, 1024]
+        start = time.time()
         features = self.forward_modules["preadapt_aggregator"](features)
+        self.time['embed_preadapt_aggregator'].append(time.time()-start)
         # print(features.shape)[1568, 2, 1024]
+        self.time['embed_all'].append(time.time()-allstart)
 
         if provide_patch_shapes:
             return _detach(features), patch_shapes
@@ -253,24 +273,26 @@ class PatchCore(torch.nn.Module):
         patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
         with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
             inft = []
-            enbedtime = []
-            processtime = []
+
+            for i in self.time:
+                self.time[i].clear()
             for image in data_iterator:
                 start = time.time()
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
-                _scores, _masks ,_embedtime,_processtime = self._predict(image,patch_memory=patch_memory)
+                _scores, _masks = self._predict(image,patch_memory=patch_memory)
                 inft.append(time.time()-start)
-                enbedtime.append(_embedtime)
-                processtime.append(_processtime)
+
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
                     masks.append(mask)
+            #print time
             print('inference time:',np.mean(inft),'fps:',1/np.mean(inft))
-            print('embed time:',np.mean(enbedtime))
-            print('process time:',np.mean(processtime))
+            for i in self.time:
+                print(i,":",np.sum(self.time[i]))
+
         return scores, masks, labels_gt, masks_gt
 
     def _predict(self, images,patch_memory=None):
@@ -283,11 +305,12 @@ class PatchCore(torch.nn.Module):
 
             #cal time
             start = time.time()
-
             features, patch_shapes = self._embed(images, provide_patch_shapes=True)
+            self.time['embed'].append(time.time()-start)
+
             features = np.asarray(features) # 1568,1024
             
-            _embedtime = time.time()-start
+            
             start = time.time()
             # patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
             # Teng add
@@ -350,8 +373,8 @@ class PatchCore(torch.nn.Module):
 
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
             # print(masks[0].shape)
-            _processtime = time.time()-start
-        return [score for score in image_scores], [mask for mask in masks],_embedtime,_processtime
+            self.time['predict_process'].append(time.time()-start)
+        return [score for score in image_scores], [mask for mask in masks]
 
     @staticmethod
     def _params_file(filepath, prepend=""):
