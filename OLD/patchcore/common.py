@@ -86,8 +86,6 @@ class FaissNN(object):
         return search_index.search(query_features, n_nearest_neighbours)
 
     def save(self, filename: str) -> None:
-        if(self.search_index is None):
-            return
         faiss.write_index(self._index_to_cpu(self.search_index), filename)
 
     def load(self, filename: str) -> None:
@@ -329,6 +327,7 @@ class NearestNeighbourScorer(object):
         self.detection_features = self.feature_merger.merge(
             detection_features,
         )
+        # print(self.detection_features.shape)
         self.nn_method.fit(self.detection_features)
 
     def predict(

@@ -250,27 +250,22 @@ class PatchCore(torch.nn.Module):
         masks = []
         labels_gt = []
         masks_gt = []
-        patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
         with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
-            inft = []
-            enbedtime = []
-            processtime = []
+            
+            patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
             for image in data_iterator:
+                inft = []
                 start = time.time()
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
-                _scores, _masks ,_embedtime,_processtime = self._predict(image,patch_memory=patch_memory)
+                _scores, _masks = self._predict(image,patch_memory=patch_memory)
                 inft.append(time.time()-start)
-                enbedtime.append(_embedtime)
-                processtime.append(_processtime)
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
                     masks.append(mask)
-            print('inference time:',np.mean(inft),'fps:',1/np.mean(inft))
-            print('embed time:',np.mean(enbedtime))
-            print('process time:',np.mean(processtime))
+            print('inference time:',np.mean(inft))
         return scores, masks, labels_gt, masks_gt
 
     def _predict(self, images,patch_memory=None):
@@ -287,7 +282,7 @@ class PatchCore(torch.nn.Module):
             features, patch_shapes = self._embed(images, provide_patch_shapes=True)
             features = np.asarray(features) # 1568,1024
             
-            _embedtime = time.time()-start
+            print('embed time:',time.time()-start)
             start = time.time()
             # patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
             # Teng add
@@ -298,25 +293,25 @@ class PatchCore(torch.nn.Module):
             features = features.transpose(1,0,2) # -1,2,1024
             features = torch.Tensor(features)
 
+            print('reshape time:',time.time()-start)
 
-
-            
+            start = time.time()
             features = features.unsqueeze(1).cuda() # -1,1,2,1024
             #patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
+            print('unsqueeze time:',time.time()-start)
 
-
-            
+            start = time.time()
             features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
             patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
 
+            print('expand time:',time.time()-start)
 
 
 
-
-            
+            start = time.time()
             distances = torch.norm(features-patch_memory,dim=3)
             min_distances,_ = torch.min(distances,dim=1)
-
+            print('dis time:',time.time()-start)
 
             image_scores = min_distances.reshape(-1,batchsize).cpu()
             # image_scores = []
@@ -333,6 +328,7 @@ class PatchCore(torch.nn.Module):
             
             #-------------------------------------------------------------------
 
+            start = time.time()
             image_scores = self.patch_maker.unpatch_scores(
                 image_scores, batchsize=batchsize
             )
@@ -350,8 +346,8 @@ class PatchCore(torch.nn.Module):
 
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
             # print(masks[0].shape)
-            _processtime = time.time()-start
-        return [score for score in image_scores], [mask for mask in masks],_embedtime,_processtime
+            print('mask time:',time.time()-start)
+        return [score for score in image_scores], [mask for mask in masks]
 
     @staticmethod
     def _params_file(filepath, prepend=""):

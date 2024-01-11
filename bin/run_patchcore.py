@@ -356,7 +356,7 @@ def sampler(name, percentage):
 @click.option("--batch_size", default=2, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
 @click.option("--resize", default="256,256", type=str, show_default=True)
-@click.option("--imagesize", default="", type=str, multiple=True, show_default=True)
+@click.option("--imagesize", default="", type=str, show_default=True)
 @click.option("--augment", is_flag=True)
 def dataset(
     name,
@@ -378,9 +378,9 @@ def dataset(
             train_dataset = dataset_library.__dict__[dataset_info[1]](
                 data_path,
                 classname=subdataset,
-                resize = [int(x) for x in resize.split(',')],
+                resize = [int(x) for x in resize.split(',')] ,
                 train_val_split=train_val_split,
-                imagesize=[int(x) for x in imagesize.split(',')],
+                imagesize = [int(x) for x in resize.split(',')] if imagesize == "" else [int(x) for x in imagesize.split(',')] ,
                 split=dataset_library.DatasetSplit.TRAIN,
                 seed=seed,
                 augment=augment,
@@ -390,7 +390,7 @@ def dataset(
                 data_path,
                 classname=subdataset,
                 resize=[int(x) for x in resize.split(',')],
-                imagesize=[int(x) for x in imagesize.split(',')],
+                imagesize = [int(x) for x in resize.split(',')] if imagesize == "" else [int(x) for x in imagesize.split(',')],
                 split=dataset_library.DatasetSplit.TEST,
                 seed=seed,
             )
@@ -421,7 +421,7 @@ def dataset(
                     classname=subdataset,
                     resize=[int(x) for x in resize.split(',')],
                     train_val_split=train_val_split,
-                    imagesize=[int(x) for x in imagesize.split(',')],
+                    imagesize = [int(x) for x in resize.split(',')] if imagesize == "" else [int(x) for x in imagesize.split(',')],
                     split=dataset_library.DatasetSplit.VAL,
                     seed=seed,
                 )

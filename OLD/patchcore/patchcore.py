@@ -12,7 +12,7 @@ import patchcore
 import patchcore.backbones
 import patchcore.common
 import patchcore.sampler
-import time
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -250,74 +250,45 @@ class PatchCore(torch.nn.Module):
         masks = []
         labels_gt = []
         masks_gt = []
-        patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
         with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
-            inft = []
-            enbedtime = []
-            processtime = []
             for image in data_iterator:
-                start = time.time()
+                
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
-                _scores, _masks ,_embedtime,_processtime = self._predict(image,patch_memory=patch_memory)
-                inft.append(time.time()-start)
-                enbedtime.append(_embedtime)
-                processtime.append(_processtime)
+                _scores, _masks = self._predict(image)
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
                     masks.append(mask)
-            print('inference time:',np.mean(inft),'fps:',1/np.mean(inft))
-            print('embed time:',np.mean(enbedtime))
-            print('process time:',np.mean(processtime))
         return scores, masks, labels_gt, masks_gt
 
-    def _predict(self, images,patch_memory=None):
+    def _predict(self, images):
         """Infer score and mask for a batch of images."""
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
 
         batchsize = images.shape[0]
         with torch.no_grad():
-
-            #cal time
-            start = time.time()
-
             features, patch_shapes = self._embed(images, provide_patch_shapes=True)
             features = np.asarray(features) # 1568,1024
             
-            _embedtime = time.time()-start
-            start = time.time()
             # patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
             # Teng add
             #--------------------------------------------------------------------
-
-            
             features = features.reshape(batchsize,-1,features.shape[-1]) # 2,-1,1024
             features = features.transpose(1,0,2) # -1,2,1024
             features = torch.Tensor(features)
 
 
-
-            
             features = features.unsqueeze(1).cuda() # -1,1,2,1024
-            #patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
+            patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
 
-
-            
             features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
             patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
 
-
-
-
-
-            
             distances = torch.norm(features-patch_memory,dim=3)
             min_distances,_ = torch.min(distances,dim=1)
-
-
             image_scores = min_distances.reshape(-1,batchsize).cpu()
             # image_scores = []
             # for i in (range(features.shape[0])):
@@ -330,8 +301,8 @@ class PatchCore(torch.nn.Module):
 
             image_scores = image_scores.transpose(1,0).reshape(-1)
             patch_scores = image_scores
-            
             #-------------------------------------------------------------------
+
 
             image_scores = self.patch_maker.unpatch_scores(
                 image_scores, batchsize=batchsize
@@ -350,8 +321,7 @@ class PatchCore(torch.nn.Module):
 
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
             # print(masks[0].shape)
-            _processtime = time.time()-start
-        return [score for score in image_scores], [mask for mask in masks],_embedtime,_processtime
+        return [score for score in image_scores], [mask for mask in masks]
 
     @staticmethod
     def _params_file(filepath, prepend=""):

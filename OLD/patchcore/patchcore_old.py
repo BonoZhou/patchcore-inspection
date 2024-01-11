@@ -7,12 +7,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import tqdm
-from torch import Tensor, nn
+
 import patchcore
 import patchcore.backbones
 import patchcore.common
 import patchcore.sampler
-import time
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -45,7 +45,7 @@ class PatchCore(torch.nn.Module):
         self.patch_maker = PatchMaker(patchsize, stride=patchstride)
 
         self.forward_modules = torch.nn.ModuleDict({})
-        self.anomaly_score_num_nn = anomaly_score_num_nn
+
         feature_aggregator = patchcore.common.NetworkFeatureAggregator(
             self.backbone, self.layers_to_extract_from, self.device
         )
@@ -76,7 +76,6 @@ class PatchCore(torch.nn.Module):
         )
 
         self.featuresampler = featuresampler
-        self.features = None
 
     def embed(self, data):
         if isinstance(data, torch.utils.data.DataLoader):
@@ -177,65 +176,13 @@ class PatchCore(torch.nn.Module):
             for image in data_iterator:
                 if isinstance(image, dict):
                     image = image["image"]
-                
-                batchsize = image.shape[0] # 2
-                
-                feature_batch_image = np.array(_image_to_features(image))
-                feature_batch_image = feature_batch_image.reshape(batchsize,-1,feature_batch_image.shape[-1]) # 2,-1,1024
+                features.append(_image_to_features(image))
 
-                features.append(feature_batch_image)
-
-        features = np.concatenate(features, axis=0) # 209,784,1024
-        self.features = torch.Tensor(features.transpose(1,0,2)) # 784,209,1024
-        # self.anomaly_scorer.fit(detection_features=[features])
-
-
-    @staticmethod
-    def euclidean_dist(x: Tensor, y: Tensor) -> Tensor:
-        """
-        Calculates pair-wise distance between row vectors in x and those in y.
-
-        Replaces torch cdist with p=2, as cdist is not properly exported to onnx and openvino format.
-        Resulting matrix is indexed by x vectors in rows and y vectors in columns.
-
-        Args:
-            x: input tensor 1
-            y: input tensor 2
-
-        Returns:
-            Matrix of distances between row vectors in x and y.
-        """
-        y = y.reshape(-1,y.shape[-1]).cuda()
-        x_norm = x.pow(2).sum(dim=-1, keepdim=True)  # |x|
-        y_norm = y.pow(2).sum(dim=-1, keepdim=True)  # |y|
-        # row distance can be rewritten as sqrt(|x| - 2 * x @ y.T + |y|.T)
-        res = x_norm - 2 * torch.matmul(x, y.transpose(-2, -1)) + y_norm.transpose(-2, -1)
-        res = res.clamp_min_(0).sqrt_()
-        return res
-
-    def nearest_neighbors(self, embedding: Tensor, n_neighbors: int, memory_bank=None):
-        """Nearest Neighbours using brute force method and euclidean norm.
-
-        Args:
-            embedding (Tensor): Features to compare the distance with the memory bank.
-            n_neighbors (int): Number of neighbors to look at
-
-        Returns:
-            Tensor: Patch scores.
-            Tensor: Locations of the nearest neighbor(s).
-        """
-        if memory_bank==None:
-            distances = self.euclidean_dist(embedding, self.features)
-        else:
-            distances = self.euclidean_dist(embedding, memory_bank)
-        if n_neighbors == 1:
-            # when n_neighbors is 1, speed up computation by using min instead of topk
-            patch_scores, locations = distances.min(1)
-        else:
-            patch_scores, locations = distances.topk(k=n_neighbors, largest=False, dim=1)
-        
-        return patch_scores, locations # 别忘了batchsize
-
+        features = np.concatenate(features, axis=0)
+        # print(features.shape)
+        features = self.featuresampler.run(features)
+        # print(features.shape)
+        self.anomaly_scorer.fit(detection_features=[features])
 
     def predict(self, data):
         if isinstance(data, torch.utils.data.DataLoader):
@@ -250,88 +197,45 @@ class PatchCore(torch.nn.Module):
         masks = []
         labels_gt = []
         masks_gt = []
-        patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
         with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
-            inft = []
-            enbedtime = []
-            processtime = []
             for image in data_iterator:
-                start = time.time()
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
-                _scores, _masks ,_embedtime,_processtime = self._predict(image,patch_memory=patch_memory)
-                inft.append(time.time()-start)
-                enbedtime.append(_embedtime)
-                processtime.append(_processtime)
+                _scores, _masks = self._predict(image)
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
                     masks.append(mask)
-            print('inference time:',np.mean(inft),'fps:',1/np.mean(inft))
-            print('embed time:',np.mean(enbedtime))
-            print('process time:',np.mean(processtime))
         return scores, masks, labels_gt, masks_gt
 
-    def _predict(self, images,patch_memory=None):
+    def _predict(self, images):
         """Infer score and mask for a batch of images."""
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
 
         batchsize = images.shape[0]
         with torch.no_grad():
-
-            #cal time
-            start = time.time()
-
             features, patch_shapes = self._embed(images, provide_patch_shapes=True)
             features = np.asarray(features) # 1568,1024
             
-            _embedtime = time.time()-start
-            start = time.time()
-            # patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
-            # Teng add
-            #--------------------------------------------------------------------
-
+            patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
+            # # Teng add
+            # #--------------------------------------------------------------------
+            # features = features.reshape(batchsize,-1,features.shape[-1]) # 2,-1,1024
+            # features = features.transpose(1,0,2) # -1,2,1024
             
-            features = features.reshape(batchsize,-1,features.shape[-1]) # 2,-1,1024
-            features = features.transpose(1,0,2) # -1,2,1024
-            features = torch.Tensor(features)
-
-
-
-            
-            features = features.unsqueeze(1).cuda() # -1,1,2,1024
-            #patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
-
-
-            
-            features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
-            patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
-
-
-
-
-
-            
-            distances = torch.norm(features-patch_memory,dim=3)
-            min_distances,_ = torch.min(distances,dim=1)
-
-
-            image_scores = min_distances.reshape(-1,batchsize).cpu()
             # image_scores = []
             # for i in (range(features.shape[0])):
-            #     # image_scores.append(self.anomaly_scorer.predict([features[i]])[0]) # 2
-            #     image_scores.append(np.array(self.nearest_neighbors((features[i]), self.anomaly_score_num_nn, self.features[i])[0].cpu()))
-            #     # image_scores.append(np.array(self.nearest_neighbors((features[i]), self.anomaly_score_num_nn)[0].cpu()))
-            
-            image_scores = np.asarray(image_scores) # (28*28,2)
-            
+            #     image_scores.append(self.anomaly_scorer.predict([features[i]])[0]) # 2
 
-            image_scores = image_scores.transpose(1,0).reshape(-1)
-            patch_scores = image_scores
-            
-            #-------------------------------------------------------------------
+            # # patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
+            # image_scores = np.asarray(image_scores) # (28*28,2)
+
+            # image_scores = image_scores.transpose(1,0).reshape(-1)
+            # patch_scores = image_scores
+            # #-------------------------------------------------------------------
+
 
             image_scores = self.patch_maker.unpatch_scores(
                 image_scores, batchsize=batchsize
@@ -350,8 +254,7 @@ class PatchCore(torch.nn.Module):
 
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
             # print(masks[0].shape)
-            _processtime = time.time()-start
-        return [score for score in image_scores], [mask for mask in masks],_embedtime,_processtime
+        return [score for score in image_scores], [mask for mask in masks]
 
     @staticmethod
     def _params_file(filepath, prepend=""):

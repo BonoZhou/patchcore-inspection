@@ -8,9 +8,6 @@ import numpy as np
 import PIL
 import torch
 import tqdm
-import cv2
-from skimage import morphology
-from skimage.segmentation import mark_boundaries
 
 LOGGER = logging.getLogger(__name__)
 
@@ -57,109 +54,29 @@ def plot_segmentation_images(
 
         if masks_provided:
             if mask_path is not None:
-                mask_gt = PIL.Image.open(mask_path).convert("RGB")
-                mask_gt = mask_transform(mask_gt)
-                if not isinstance(mask_gt, np.ndarray):
-                    mask_gt = mask_gt.numpy()
+                mask = PIL.Image.open(mask_path).convert("RGB")
+                mask = mask_transform(mask)
+                if not isinstance(mask, np.ndarray):
+                    mask = mask.numpy()
             else:
-                mask_gt = np.zeros_like(image)
+                mask = np.zeros_like(image)
 
-        savename = image_path.split("\\")  # for windows system, / for linux
+        savename = image_path.split("/")
         savename = "_".join(savename[-save_depth:])
         savename = os.path.join(savefolder, savename)
+        f, axes = plt.subplots(1, 2 + int(masks_provided))
+        axes[0].imshow(image.transpose(1, 2, 0))
+        # axes[1].imshow(mask.transpose(1, 2, 0))
+        axes[1].imshow(segmentation>0.5) # 异常阈值设置
+        axes[2].imshow(segmentation,vmin=0,vmax=1)
 
+        _, image_height, image_width = image.shape
+        f.set_size_inches(3*image_width/80, image_height/80)
+        # f.set_size_inches(3 * (2 + int(masks_provided)), 3)
+        f.tight_layout()
+        f.savefig(savename)
+        plt.close()
 
-
-        if(True):
-            f, axes = plt.subplots(1, 4 + int(masks_provided))
-
-        
-            superimpose = superimpose_anomaly_map(segmentation, image.transpose(1, 2, 0))
-            mask = compute_mask(segmentation, 0.3)
-            boundary = mark_boundaries(image.transpose(1, 2, 0), mask, color=(1, 0, 0),mode='thick')
-
-
-
-            f.suptitle(anomaly_score)
-            axes[0].imshow(image.transpose(1, 2, 0))
-            axes[0].axis('off')
-            axes[1].imshow(superimpose)
-            axes[1].axis('off')
-            axes[2].imshow(segmentation)
-            axes[2].axis('off')
-            axes[3].imshow(mask, cmap='gray')#mask为黑白图，需要用灰度图显示
-            axes[3].axis('off')
-            axes[4].imshow(boundary)
-            axes[4].axis('off')
-
-            _,height,width = image.shape
-            dpi = 100
-            f.set_size_inches(width / dpi * (4 + int(masks_provided)), height / dpi + 1)
-            f.tight_layout(w_pad=0 ,pad = 0)
-            f.savefig(savename)
-            plt.close()
-        else:
-            f, axes = plt.subplots(1, 2 + int(masks_provided))
-
-            f.suptitle(anomaly_score)
-            axes[0].imshow(image.transpose(1, 2, 0))
-            axes[0].axis('off')
-            axes[1].imshow(mask.transpose(1, 2, 0))
-            axes[1].axis('off')
-            axes[2].imshow(segmentation)
-            axes[2].axis('off')
-            _,height,width = image.shape
-            dpi = 100
-            f.set_size_inches(width / dpi * (2 + int(masks_provided)), height / dpi + 1)
-            f.tight_layout(w_pad=0 ,pad = 0)
-            f.savefig(savename)
-            plt.close()
-
-
-def superimpose_anomaly_map(
-    anomaly_map: np.ndarray, image: np.ndarray, alpha: float = 0.4, gamma: int = 0, normalize: bool = False
-) -> np.ndarray:
-    """Superimpose anomaly map on top of in the input image.
-
-    Args:
-        anomaly_map (np.ndarray): Anomaly map
-        image (np.ndarray): Input image
-        alpha (float, optional): Weight to overlay anomaly map
-            on the input image. Defaults to 0.4.
-        gamma (int, optional): Value to add to the blended image
-            to smooth the processing. Defaults to 0. Overall,
-            the formula to compute the blended image is
-            I' = (alpha*I1 + (1-alpha)*I2) + gamma
-        normalize: whether or not the anomaly maps should
-            be normalized to image min-max
-
-
-    Returns:
-        np.ndarray: Image with anomaly map superimposed on top of it.
-    """
-    anomaly_map = anomaly_map_to_color_map(anomaly_map.squeeze(), normalize=normalize)
-    superimposed_map = cv2.addWeighted(anomaly_map, alpha, image, (1 - alpha), gamma)
-    return superimposed_map
-
-def anomaly_map_to_color_map(anomaly_map: np.ndarray, normalize: bool = True) -> np.ndarray:
-    """Compute anomaly color heatmap.
-
-    Args:
-        anomaly_map (np.ndarray): Final anomaly map computed by the distance metric.
-        normalize (bool, optional): Bool to normalize the anomaly map prior to applying
-            the color map. Defaults to True.
-
-    Returns:
-        np.ndarray: [description]
-    """
-    if normalize:
-        anomaly_map = (anomaly_map - anomaly_map.min()) / np.ptp(anomaly_map)
-    anomaly_map = anomaly_map * 255
-    anomaly_map = anomaly_map.astype(np.uint8)
-
-    anomaly_map = cv2.applyColorMap(anomaly_map, cv2.COLORMAP_JET)
-    anomaly_map = cv2.cvtColor(anomaly_map, cv2.COLOR_BGR2RGB)
-    return anomaly_map
 
 def create_storage_folder(
     main_folder_path, project_folder, group_folder, mode="iterate"
@@ -178,29 +95,6 @@ def create_storage_folder(
         os.makedirs(save_path, exist_ok=True)
 
     return save_path
-
-def compute_mask(anomaly_map: np.ndarray, threshold: float, kernel_size: int = 4) -> np.ndarray:
-    """Compute anomaly mask via thresholding the predicted anomaly map.
-
-    Args:
-        anomaly_map (np.ndarray): Anomaly map predicted via the model
-        threshold (float): Value to threshold anomaly scores into 0-1 range.
-        kernel_size (int): Value to apply morphological operations to the predicted mask. Defaults to 4.
-
-    Returns:
-        Predicted anomaly mask
-    """
-
-    anomaly_map = anomaly_map.squeeze()
-    mask: np.ndarray = np.zeros_like(anomaly_map).astype(np.uint8)
-    mask[anomaly_map > threshold] = 1
-
-    kernel = morphology.disk(kernel_size)
-    mask = morphology.opening(mask, kernel)
-
-    mask *= 255
-
-    return mask
 
 
 def set_torch_device(gpu_ids):
