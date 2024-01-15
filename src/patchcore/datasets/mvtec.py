@@ -4,6 +4,7 @@ from enum import Enum
 import PIL
 import torch
 from torchvision import transforms
+import platform
 
 _CLASSNAMES = [
     "bottle",
@@ -92,10 +93,10 @@ class MVTecDataset(torch.utils.data.Dataset):
 
 
     def __getitem__(self, idx):
-        classname, anomaly, image_path, mask_path = self.data_to_iterate[idx]
+        classname, anomaly, image_path, mask_path, defectpos = self.data_to_iterate[idx]
         image = PIL.Image.open(image_path).convert("RGB")
         image = self.transform_img(image)
-
+        
         if self.split == DatasetSplit.TEST and mask_path is not None:
             try:
                 mask = PIL.Image.open(mask_path)
@@ -104,7 +105,6 @@ class MVTecDataset(torch.utils.data.Dataset):
                 mask = torch.zeros([1, *image.size()[1:]])    
         else:
             mask = torch.zeros([1, *image.size()[1:]])
-
         return {
             "image": image,
             "mask": mask,
@@ -113,6 +113,7 @@ class MVTecDataset(torch.utils.data.Dataset):
             "is_anomaly": int(anomaly != "good"),
             "image_name": "/".join(image_path.split("/")[-4:]),
             "image_path": image_path,
+            "defectpos":defectpos,
         }
 
     def __len__(self):
@@ -121,6 +122,7 @@ class MVTecDataset(torch.utils.data.Dataset):
     def get_image_data(self):
         imgpaths_per_class = {}
         maskpaths_per_class = {}
+        defectpos_per_class = {}
 
         for classname in self.classnames_to_use:
             classpath = os.path.join(self.source, classname, self.split.value)
@@ -129,6 +131,7 @@ class MVTecDataset(torch.utils.data.Dataset):
 
             imgpaths_per_class[classname] = {}
             maskpaths_per_class[classname] = {}
+            defectpos_per_class[classname] = {}
 
             for anomaly in anomaly_types:
                 anomaly_path = os.path.join(classpath, anomaly)
@@ -158,14 +161,52 @@ class MVTecDataset(torch.utils.data.Dataset):
                         ]
                     except:
                         maskpaths_per_class[classname][anomaly] = None
+
+                    #Zhou Added: get defect position
+                    try:
+                        defectpath = os.path.join(os.path.dirname(classpath), "DefectImage.txt")
+                        print(defectpath)
+                        defectpos_per_image = {}
+                        if os.path.isfile(defectpath):
+                            with open(defectpath,'r') as f:
+                                for line in f:
+                                    # 分割每一行的数据
+                                    image_path, *defect_pos = line.strip().split(',')
+
+                                    # 将图像路径转换为完整路径
+                                    image_name = image_path.split('\\')[-1]
+
+                                    # 将缺陷位置转换为整数
+                                    defect_pos = list(map(int, defect_pos))
+
+                                    # 将数据添加到字典中
+                                    if image_name in defectpos_per_image:
+                                        defectpos_per_image[image_name].append(defect_pos)
+                                    else:
+                                        defectpos_per_image[image_name] = [defect_pos]
+                            
+                        #print(defectpos)
+
+                        #print(defectpos)
+                        defectpos_per_class[classname][anomaly] = defectpos_per_image
+                        
+                    except:
+                        defectpos_per_class[classname][anomaly] = None
+                    
                 else:
                     maskpaths_per_class[classname]["good"] = None
+
 
         # Unrolls the data dictionary to an easy-to-iterate list.
         data_to_iterate = []
         for classname in sorted(imgpaths_per_class.keys()):
             for anomaly in sorted(imgpaths_per_class[classname].keys()):
                 for i, image_path in enumerate(imgpaths_per_class[classname][anomaly]):
+                    #Zhou Added: get defectpos and maskpath
+                    if platform.system() == 'Windows':  
+                        image_name = image_path.split("\\")[-1]
+                    else:
+                        image_name = image_path.split("/")[-1]
                     data_tuple = [classname, anomaly, image_path]
                     if self.split == DatasetSplit.TEST and anomaly != "good":
                         if maskpaths_per_class[classname][anomaly] is not None:
@@ -174,6 +215,13 @@ class MVTecDataset(torch.utils.data.Dataset):
                             data_tuple.append(None)
                     else:
                         data_tuple.append(None)
+                    if self.split == DatasetSplit.TEST and anomaly != "good":
+                        if defectpos_per_class[classname][anomaly].get(image_name) is not None:
+                            data_tuple.append(defectpos_per_class[classname][anomaly][image_name])
+                        else:
+                            data_tuple.append([])
+                    else:
+                            data_tuple.append([])
                     data_to_iterate.append(data_tuple)
-
         return imgpaths_per_class, data_to_iterate
+

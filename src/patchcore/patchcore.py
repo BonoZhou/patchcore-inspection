@@ -83,7 +83,10 @@ class PatchCore(torch.nn.Module):
                      'embed_reshape':[],
                      'embed':[],
                      'predict_process':[],
-                     'embed_all':[]} # time calculate
+                     'embed_all':[],
+                     'embed_detach':[],
+                     'predict_postprocessing':[],
+                     'predict_tocpu':[]} # time calculate
 
 
     def embed(self, data):
@@ -102,9 +105,14 @@ class PatchCore(torch.nn.Module):
         """Returns feature embeddings for images."""
         allstart = time.time()
         def _detach(features):
+            start_time = time.time()  
+
             if detach:
-                return [x.detach().cpu().numpy() for x in features]
-            return features
+                result = [x.detach().cpu().numpy() for x in features]
+            else:
+                result = features
+            self.time['embed_detach'].append(time.time()-start_time)
+            return result
 
 
         start = time.time()
@@ -271,18 +279,25 @@ class PatchCore(torch.nn.Module):
         labels_gt = []
         masks_gt = []
         patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
-        with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
-            inft = []
 
-            for i in self.time:
-                self.time[i].clear()
+        #time calculate
+        inft = []
+        for i in self.time:
+            self.time[i].clear()
+        
+        with tqdm.tqdm(dataloader, desc="Inferring...", leave=True) as data_iterator:
             for image in data_iterator:
                 start = time.time()
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
+                    pos = image["defectpos"]
                     image = image["image"]
-                _scores, _masks = self._predict(image,patch_memory=patch_memory)
+                if len(pos)==0:    
+                    _scores, _masks = self._predict(image,patch_memory=patch_memory)
+                else:
+                    for i in pos:
+                        _scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
                 inft.append(time.time()-start)
 
                 for score, mask in zip(_scores, _masks):
@@ -295,53 +310,93 @@ class PatchCore(torch.nn.Module):
 
         return scores, masks, labels_gt, masks_gt
 
-    def _predict(self, images,patch_memory=None):
+
+    def _predict(self, images,patch_memory=None,starth=0,startw=0,width=-1,height=-1):
         """Infer score and mask for a batch of images."""
+
+        #按块裁切图像
+        def _getcoord(starth,startw,width,height):
+            def ceil(x):
+                if isinstance(x,torch.Tensor):
+                    return int(torch.ceil(x))
+                else: return int(torch.tensor([x]).ceil().item())
+            def floor(x):
+                if isinstance(x,torch.Tensor):
+                    return int(torch.floor(x))
+                else: return int(torch.tensor([x]).floor().item())
+            sh = floor(starth/8)
+            sw = floor(startw/8)
+            eh = ceil((starth+height)/8)
+            ew = ceil((startw+width)/8)
+            return 8*sh,8*sw,8*eh,8*ew
+        
+        def getindex(h,w,sh,sw,eh,ew):
+            w = w//8
+            index = []
+            for i in range(sh//8,eh//8):
+                for j in range(sw//8,ew//8):
+                    index.append(i*w+j)
+            #print("h,w,sh,sw,eh,ew:",h,w,sh,sw,eh,ew)
+            #print(index)
+            return torch.tensor(index).cuda()
+
+
+        if height==-1:
+            height = images.shape[-2]
+        if width==-1:
+            width = images.shape[-1]
+        #print(images.shape)
+        
+        sh,sw,eh,ew = _getcoord(starth,startw,width,height)
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
 
         batchsize = images.shape[0]
+
+        #裁切图像
+        eh,ew = min(eh,images.shape[-2]),min(ew,images.shape[-1])
+        cropped_image = images[:,:,sh:eh,sw:ew]
+        index = getindex(images.shape[-2],images.shape[-1],sh,sw,eh,ew)
+
         with torch.no_grad():
 
             #cal time
             start = time.time()
-            features, patch_shapes = self._embed(images, provide_patch_shapes=True)
+            #features, patch_shapes = self._embed(images, detach=False ,provide_patch_shapes=True)#patch_shape:[[397, 106], [199, 53]]
+            features,patch_shapes = self._embed(cropped_image, detach=False,provide_patch_shapes=True)
+            #print(patch_shapes)
             self.time['embed'].append(time.time()-start)
 
-            features = np.asarray(features) # 1568,1024
+            #features = np.asarray(features) # 2x28x28=1568,1024
             
-            
+            #print(features.shape)
+            #print(patch_memory.shape)
             start = time.time()
             # patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
             # Teng add
             #--------------------------------------------------------------------
-
-            
+  
             features = features.reshape(batchsize,-1,features.shape[-1]) # 2,-1,1024
-            features = features.transpose(1,0,2) # -1,2,1024
-            features = torch.Tensor(features)
-
-
-
+            features = features.permute(1, 0, 2)  # -1, 2, 1024
+            #features = torch.Tensor(features)
             
-            features = features.unsqueeze(1).cuda() # -1,1,2,1024
+            features = features.unsqueeze(1) # -1,1,2,1024
             #patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
-
-
             
-            features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
-            patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
+            #features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
+            #patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
 
-
-
-
-
-            
-            distances = torch.norm(features-patch_memory,dim=3)
+            distances = torch.norm(features-torch.index_select(patch_memory,0,index),dim=3)
             min_distances,_ = torch.min(distances,dim=1)
+            self.time['predict_process'].append(time.time()-start)
 
+            start = time.time()
 
             image_scores = min_distances.reshape(-1,batchsize).cpu()
+
+            self.time['predict_tocpu'].append(time.time()-start)
+
+            start = time.time()
             # image_scores = []
             # for i in (range(features.shape[0])):
             #     # image_scores.append(self.anomaly_scorer.predict([features[i]])[0]) # 2
@@ -373,7 +428,7 @@ class PatchCore(torch.nn.Module):
 
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
             # print(masks[0].shape)
-            self.time['predict_process'].append(time.time()-start)
+            self.time['predict_postprocessing'].append(time.time()-start)
         return [score for score in image_scores], [mask for mask in masks]
 
     @staticmethod
@@ -437,19 +492,23 @@ class PatchMaker:
             patchsize]
         """
         padding = int((self.patchsize - 1) / 2)
+        #print("features:",features.shape)#[1, 512, h/8, w/8] [1, 1024, h/16, w/16]
         unfolder = torch.nn.Unfold(
             kernel_size=self.patchsize, stride=self.stride, padding=padding, dilation=1
         )
         unfolded_features = unfolder(features)
+        #print("unfolded_features:",unfolded_features.shape)#[1, 4608, w/8xh/8]
         number_of_total_patches = []
         for s in features.shape[-2:]:
             n_patches = (
                 s + 2 * padding - 1 * (self.patchsize - 1) - 1
             ) / self.stride + 1
             number_of_total_patches.append(int(n_patches))
+        #print("before:",unfolded_features.shape)#[1, 4608, w/8xh/8]
         unfolded_features = unfolded_features.reshape(
             *features.shape[:2], self.patchsize, self.patchsize, -1
         )
+        #print("after:",unfolded_features.shape)#[1, 512, 3, 3, w/8xh/8]
         unfolded_features = unfolded_features.permute(0, 4, 1, 2, 3)
 
         if return_spatial_info:

@@ -353,7 +353,7 @@ def sampler(name, percentage):
 @click.argument("data_path", type=click.Path(exists=True, file_okay=False))
 @click.option("--subdatasets", "-d", multiple=True, type=str, required=True)
 @click.option("--train_val_split", type=float, default=1, show_default=True)
-@click.option("--batch_size", default=2, type=int, show_default=True)
+@click.option("--batch_size", default=1, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
 @click.option("--resize", default="256,256", type=str, show_default=True)
 @click.option("--imagesize", default="", type=str, show_default=True)
