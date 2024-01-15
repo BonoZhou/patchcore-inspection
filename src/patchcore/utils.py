@@ -11,6 +11,7 @@ import tqdm
 import cv2
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
+import platform
 
 LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +65,11 @@ def plot_segmentation_images(
             else:
                 mask_gt = np.zeros_like(image)
 
-        savename = image_path.split("\\")  # for windows system, / for linux
+        if platform.system() == 'Windows':  
+            savename = image_path.split("\\")
+        else:
+            savename = image_path.split("/")
+        #savename = image_path.split("\\")  # for windows system, / for linux
         savename = "_".join(savename[-save_depth:])
         savename = os.path.join(savefolder, savename)
 
