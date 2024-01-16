@@ -191,16 +191,37 @@ class RescaleSegmentor:
         self.target_size = target_size
         self.smoothing = 4
 
-    def convert_to_segmentation(self, patch_scores):
+    def convert_to_segmentation(self, patch_scores, image_shape=None,padding=None):
 
         with torch.no_grad():
             if isinstance(patch_scores, np.ndarray):
                 patch_scores = torch.from_numpy(patch_scores)
             _scores = patch_scores.to(self.device)
             _scores = _scores.unsqueeze(1)
+
+            #print(self.target_size)
+            #提供了image_shape，就用image_shape，否则用target_size
+            if image_shape is not None:
+                sh, sw, eh, ew = padding
+                print(sh, sw, eh, ew,image_shape)
+                print(self.target_size)
+                padding = (sw, self.target_size[1] - ew,sh,  self.target_size[0] - eh)
+                print(padding)
+                _scores = F.interpolate(
+                    _scores, size=image_shape, mode="bilinear", align_corners=False
+                )
+                _scores = F.pad(_scores, padding, mode="constant", value=0)
+                print(_scores.shape)
+
+            else:
+                _scores = F.interpolate(
+                    _scores, size=self.target_size, mode="bilinear", align_corners=False
+                )
+            '''
             _scores = F.interpolate(
                 _scores, size=self.target_size, mode="bilinear", align_corners=False
             )
+            '''
             _scores = _scores.squeeze(1)
             patch_scores = _scores.cpu().numpy()
 

@@ -296,8 +296,12 @@ class PatchCore(torch.nn.Module):
                 if len(pos)==0:    
                     _scores, _masks = self._predict(image,patch_memory=patch_memory)
                 else:
+                    '''
                     for i in pos:
                         _scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
+                    '''
+                    i = pos[0]
+                    _scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
                 inft.append(time.time()-start)
 
                 for score, mask in zip(_scores, _masks):
@@ -328,8 +332,9 @@ class PatchCore(torch.nn.Module):
             sw = floor(startw/8)
             eh = ceil((starth+height)/8)
             ew = ceil((startw+width)/8)
-            return 8*sh,8*sw,8*eh,8*ew
+            return 8*sh,8*sw,8*eh,8*ew,8*(eh-sh),8*(ew-sw)
         
+        #获取patch_memory的图像索引
         def getindex(h,w,sh,sw,eh,ew):
             w = w//8
             index = []
@@ -340,14 +345,14 @@ class PatchCore(torch.nn.Module):
             #print(index)
             return torch.tensor(index).cuda()
 
-
+        print("starth,startw,width,height:",starth,startw,width,height)
         if height==-1:
             height = images.shape[-2]
         if width==-1:
             width = images.shape[-1]
         #print(images.shape)
         
-        sh,sw,eh,ew = _getcoord(starth,startw,width,height)
+        sh,sw,eh,ew,h,w = _getcoord(starth,startw,width,height)
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
 
@@ -356,6 +361,7 @@ class PatchCore(torch.nn.Module):
         #裁切图像
         eh,ew = min(eh,images.shape[-2]),min(ew,images.shape[-1])
         cropped_image = images[:,:,sh:eh,sw:ew]
+        #print(cropped_image.shape)#[1,3,w,h]
         index = getindex(images.shape[-2],images.shape[-1],sh,sw,eh,ew)
 
         with torch.no_grad():
@@ -416,9 +422,9 @@ class PatchCore(torch.nn.Module):
             )
             # print(image_scores.shape)
             image_scores = image_scores.reshape(*image_scores.shape[:2], -1)
-            # print(image_scores.shape)
+            #print(image_scores.shape)
             image_scores = self.patch_maker.score(image_scores)
-            # print(image_scores)
+            #print(image_scores)
             patch_scores = self.patch_maker.unpatch_scores(
                 patch_scores, batchsize=batchsize
             )
@@ -426,8 +432,8 @@ class PatchCore(torch.nn.Module):
             # print(scales)
             patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])
 
-            masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
-            # print(masks[0].shape)
+            masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores,image_shape=(h,w),padding=(sh,sw,eh,ew))
+            #print(masks[0].shape)
             self.time['predict_postprocessing'].append(time.time()-start)
         return [score for score in image_scores], [mask for mask in masks]
 
