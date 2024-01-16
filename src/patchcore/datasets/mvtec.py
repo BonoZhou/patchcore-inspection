@@ -165,7 +165,7 @@ class MVTecDataset(torch.utils.data.Dataset):
                     #Zhou Added: get defect position
                     try:
                         defectpath = os.path.join(os.path.dirname(classpath), "DefectImage.txt")
-                        print(defectpath)
+                        #print(defectpath)
                         defectpos_per_image = {}
                         if os.path.isfile(defectpath):
                             with open(defectpath,'r') as f:
