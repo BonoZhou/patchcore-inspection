@@ -203,15 +203,15 @@ class RescaleSegmentor:
             #提供了image_shape，就用image_shape，否则用target_size
             if image_shape is not None:
                 sh, sw, eh, ew = padding
-                print(sh, sw, eh, ew,image_shape)
-                print(self.target_size)
+                #print(sh, sw, eh, ew,image_shape)
+                #print(self.target_size)
                 padding = (sw, self.target_size[1] - ew,sh,  self.target_size[0] - eh)
-                print(padding)
+                #print(padding)
                 _scores = F.interpolate(
                     _scores, size=image_shape, mode="bilinear", align_corners=False
                 )
                 _scores = F.pad(_scores, padding, mode="constant", value=0)
-                print(_scores.shape)
+                #print(_scores.shape)
 
             else:
                 _scores = F.interpolate(
