@@ -301,7 +301,7 @@ class PatchCore(torch.nn.Module):
                 else:
                     
                     for i in pos:
-                        _scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
+                        _scores, _masks = self._predict(image,patch_memory=patch_memory,startw=i[0],starth=i[1],width=i[2],height=i[3])
                         _scorelist.append(_scores)
                         _masklist.append(_masks)
                     _scores = np.sum(_scorelist,axis=0)
@@ -321,7 +321,7 @@ class PatchCore(torch.nn.Module):
         return scores, masks, labels_gt, masks_gt
 
 
-    def _predict(self, images,patch_memory=None,starth=0,startw=0,width=-1,height=-1):
+    def _predict(self, images,patch_memory=None,startw=0,starth=0,width=-1,height=-1):
         """Infer score and mask for a batch of images."""
 
         #按块裁切图像

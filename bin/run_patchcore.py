@@ -113,6 +113,11 @@ def run(
                 aggregator["segmentations"].append(segmentations)
 
             scores = np.array(aggregator["scores"])
+
+
+
+            #Zhou changed score
+            '''
             min_scores = scores.min(axis=-1).reshape(-1, 1)
             max_scores = scores.max(axis=-1).reshape(-1, 1)
             scores = (scores - min_scores) / (max_scores - min_scores)
@@ -131,7 +136,8 @@ def run(
             )
             segmentations = (segmentations - min_scores) / (max_scores - min_scores)
             segmentations = np.mean(segmentations, axis=0)
-
+            '''
+            segmentations = np.array(aggregator["segmentations"])
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
