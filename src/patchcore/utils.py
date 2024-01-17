@@ -12,6 +12,7 @@ import cv2
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
 import platform
+import matplotlib.patches as patches
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ def plot_segmentation_images(
     image_transform=lambda x: x,
     mask_transform=lambda x: x,
     save_depth=4,
+    boxpos = []
 ):
     """Generate anomaly segmentation images.
 
@@ -45,8 +47,8 @@ def plot_segmentation_images(
 
     os.makedirs(savefolder, exist_ok=True)
 
-    for image_path, mask_path, anomaly_score, segmentation in tqdm.tqdm(
-        zip(image_paths, mask_paths, anomaly_scores, segmentations),
+    for image_path, mask_path, anomaly_score, segmentation,boxes in tqdm.tqdm(
+        zip(image_paths, mask_paths, anomaly_scores, segmentations,boxpos),
         total=len(image_paths),
         desc="Generating Segmentation Images...",
         leave=False,
@@ -82,12 +84,16 @@ def plot_segmentation_images(
             superimpose = superimpose_anomaly_map(segmentation, image.transpose(1, 2, 0))
             mask = compute_mask(segmentation, 0.3)
             boundary = mark_boundaries(image.transpose(1, 2, 0), mask, color=(1, 0, 0),mode='thick')
-
+            
 
 
             f.suptitle(anomaly_score, fontsize=20, y=1.02)
             axes[0].imshow(image.transpose(1, 2, 0))
+
             axes[0].axis('off')
+            for box in boxes:
+                rect = patches.Rectangle((box[0], box[1]), box[2], box[3], linewidth=1, edgecolor='r', facecolor='none')
+                axes[0].add_patch(rect)
             axes[1].imshow(superimpose)
             axes[1].axis('off')
             axes[2].imshow(segmentation)

@@ -138,6 +138,7 @@ def run(
             segmentations = np.mean(segmentations, axis=0)
             '''
             segmentations = np.array(aggregator["segmentations"])
+            segmentations = np.mean(segmentations, axis=0)
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
@@ -150,6 +151,10 @@ def run(
                 mask_paths = [
                     x[3] for x in dataloaders["testing"].dataset.data_to_iterate
                 ]
+                boxpos = [
+                    x[4] for x in dataloaders["testing"].dataset.data_to_iterate
+                ]
+                
 
                 def image_transform(image):
                     in_std = np.array(
@@ -178,6 +183,7 @@ def run(
                     mask_paths,
                     image_transform=image_transform,
                     mask_transform=mask_transform,
+                    boxpos=boxpos
                 )
 
             LOGGER.info("Computing evaluation metrics.")
