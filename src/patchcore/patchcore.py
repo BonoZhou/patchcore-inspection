@@ -118,6 +118,7 @@ class PatchCore(torch.nn.Module):
         start = time.time()
         _ = self.forward_modules["feature_aggregator"].eval()
         with torch.no_grad():
+            #print(images.shape)
             features = self.forward_modules["feature_aggregator"](images)
         self.time['embed_feature_aggregator'].append(time.time()-start)
 
@@ -287,6 +288,8 @@ class PatchCore(torch.nn.Module):
         
         with tqdm.tqdm(dataloader, desc="Inferring...", leave=True) as data_iterator:
             for image in data_iterator:
+                _scorelist = []
+                _masklist = []
                 start = time.time()
                 if isinstance(image, dict):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
@@ -296,12 +299,15 @@ class PatchCore(torch.nn.Module):
                 if len(pos)==0:    
                     _scores, _masks = self._predict(image,patch_memory=patch_memory)
                 else:
-                    '''
+                    
                     for i in pos:
                         _scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
-                    '''
-                    i = pos[0]
-                    _scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
+                        _scorelist.append(_scores)
+                        _masklist.append(_masks)
+                    _scores = np.sum(_scorelist,axis=0)
+                    _masks = np.sum(_masklist,axis=0)
+                    #i = pos[0]
+                    #_scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
                 inft.append(time.time()-start)
 
                 for score, mask in zip(_scores, _masks):
@@ -345,7 +351,7 @@ class PatchCore(torch.nn.Module):
             #print(index)
             return torch.tensor(index).cuda()
 
-        print("starth,startw,width,height:",starth,startw,width,height)
+        #print("starth,startw,width,height:",starth,startw,width,height)
         if height==-1:
             height = images.shape[-2]
         if width==-1:
