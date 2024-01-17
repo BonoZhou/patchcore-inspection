@@ -87,7 +87,7 @@ def plot_segmentation_images(
             
 
 
-            f.suptitle("anomaly score:" + anomaly_score, fontsize=30, y=1)
+            f.suptitle("anomaly score:" + str(anomaly_score), fontsize=30, y=1)
             axes[0].imshow(image.transpose(1, 2, 0))
 
             axes[0].axis('off')
