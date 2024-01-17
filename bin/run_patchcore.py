@@ -139,6 +139,7 @@ def run(
             '''
             segmentations = np.array(aggregator["segmentations"])
             segmentations = np.mean(segmentations, axis=0)
+            scores = np.mean(scores, axis=0)
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
