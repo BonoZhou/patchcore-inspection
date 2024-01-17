@@ -304,7 +304,7 @@ class PatchCore(torch.nn.Module):
                         _scores, _masks = self._predict(image,patch_memory=patch_memory,startw=i[0],starth=i[1],width=i[2],height=i[3])
                         _scorelist.append(_scores)
                         _masklist.append(_masks)
-                    _scores = np.mean(_scorelist,axis=0)
+                    _scores = np.max(_scorelist,axis=0)
                     _masks = np.sum(_masklist,axis=0)
                     #i = pos[0]
                     #_scores, _masks = self._predict(image,patch_memory=patch_memory,starth=i[1],startw=i[0],width=i[2],height=i[3])
