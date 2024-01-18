@@ -26,7 +26,9 @@ def plot_segmentation_images(
     image_transform=lambda x: x,
     mask_transform=lambda x: x,
     save_depth=4,
-    boxpos = []
+    boxpos = [],
+    threshold = 0.3,
+    segmentationthreshold = 0.5,
 ):
     """Generate anomaly segmentation images.
 
@@ -82,12 +84,15 @@ def plot_segmentation_images(
 
         
             superimpose = superimpose_anomaly_map(segmentation, image.transpose(1, 2, 0))
-            mask = compute_mask(segmentation, 0.3)
+            mask = compute_mask(segmentation, segmentationthreshold)
             boundary = mark_boundaries(image.transpose(1, 2, 0), mask, color=(1, 0, 0),mode='thick')
             
 
-
-            f.suptitle("anomaly score:" + str(anomaly_score), fontsize=30, y=1)
+            if anomaly_score > threshold:
+                judgement = "anomaly"
+            else:
+                judgement = "normal"
+            f.suptitle("anomaly score:" + str(anomaly_score) + " judgement:" + judgement, fontsize=30, y=1)
             axes[0].imshow(image.transpose(1, 2, 0))
 
             axes[0].axis('off')

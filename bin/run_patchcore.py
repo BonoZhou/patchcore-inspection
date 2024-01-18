@@ -139,11 +139,35 @@ def run(
             '''
             segmentations = np.array(aggregator["segmentations"])
             segmentations = np.mean(segmentations, axis=0)
+            print("segmentations: ", segmentations.shape)
+            # 对于每一张图像
+            _segmentationthreshold = []
+            for i in range(segmentations.shape[0]):
+                # 获取当前图像
+                image = segmentations[i]
+
+                # 获取非零元素
+                nonzero_elements = image[image > 0]
+
+                # 计算非零元素的均值和最大值
+                mean_value = np.mean(nonzero_elements)
+                max_value = np.max(nonzero_elements)
+
+                # 计算最高的90%和95%的值
+                value_90 = np.percentile(nonzero_elements, 90)
+                value_95 = np.percentile(nonzero_elements, 95)
+                value_99 = np.percentile(nonzero_elements, 99)
+                _segmentationthreshold.append(max_value)
+
+                #print("Image", i, "mean_value: ", mean_value, "max_value: ", max_value, "90% value: ", value_90, "95% value: ", value_95 , "99% value: ", value_99)
+            
             scores = np.mean(scores, axis=0)
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
-
+            threshold = np.max(scores[np.logical_not(anomaly_labels)])
+            _segmentationthreshold = np.array(_segmentationthreshold)
+            segmentationthreshold = np.max(_segmentationthreshold[np.logical_not(anomaly_labels)])
             # (Optional) Plot example images.
             if save_segmentation_images:
                 image_paths = [
@@ -184,7 +208,9 @@ def run(
                     mask_paths,
                     image_transform=image_transform,
                     mask_transform=mask_transform,
-                    boxpos=boxpos
+                    boxpos=boxpos,
+                    threshold=threshold,
+                    segmentationthreshold=segmentationthreshold,
                 )
 
             LOGGER.info("Computing evaluation metrics.")
