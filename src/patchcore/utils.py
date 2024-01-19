@@ -101,7 +101,7 @@ def plot_segmentation_images(
                 axes[0].add_patch(rect)
             axes[1].imshow(superimpose)
             axes[1].axis('off')
-            axes[2].imshow(segmentation)
+            axes[2].imshow(segmentation,vmin=0,vmax=1)
             axes[2].axis('off')
             axes[3].imshow(mask, cmap='gray')#mask为黑白图，需要用灰度图显示
             axes[3].axis('off')
