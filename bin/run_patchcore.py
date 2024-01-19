@@ -122,7 +122,7 @@ def run(
             max_scores = scores.max(axis=-1).reshape(-1, 1)
             scores = (scores - min_scores) / (max_scores - min_scores)
             scores = np.mean(scores, axis=0)
-
+            '''
             segmentations = np.array(aggregator["segmentations"])
             min_scores = (
                 segmentations.reshape(len(segmentations), -1)
@@ -136,9 +136,9 @@ def run(
             )
             segmentations = (segmentations - min_scores) / (max_scores - min_scores)
             segmentations = np.mean(segmentations, axis=0)
-            '''
-            segmentations = np.array(aggregator["segmentations"])
-            segmentations = np.mean(segmentations, axis=0)
+            
+            #segmentations = np.array(aggregator["segmentations"])
+            #segmentations = np.mean(segmentations, axis=0)
             print("segmentations: ", segmentations.shape)
             # 对于每一张图像
             _segmentationthreshold = []
@@ -154,9 +154,9 @@ def run(
                 max_value = np.max(nonzero_elements)
 
                 # 计算最高的90%和95%的值
-                value_90 = np.percentile(nonzero_elements, 90)
-                value_95 = np.percentile(nonzero_elements, 95)
-                value_99 = np.percentile(nonzero_elements, 99)
+                #value_90 = np.percentile(nonzero_elements, 90)
+                #value_95 = np.percentile(nonzero_elements, 95)
+                #value_99 = np.percentile(nonzero_elements, 99)
                 _segmentationthreshold.append(max_value)
 
                 #print("Image", i, "mean_value: ", mean_value, "max_value: ", max_value, "90% value: ", value_90, "95% value: ", value_95 , "99% value: ", value_99)

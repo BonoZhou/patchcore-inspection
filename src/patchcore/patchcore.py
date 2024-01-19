@@ -340,6 +340,10 @@ class PatchCore(torch.nn.Module):
             ew = ceil((startw+width)/8)
             return 8*sh,8*sw,8*eh,8*ew,8*(eh-sh),8*(ew-sw)
         
+        #获取扩充后的裁切图像的坐标
+        def _getboundedcoord(sh,sw,eh,ew):
+            return max(0,sh-64),max(0,sw-64),min(eh+64,images.shape[-2]),min(ew+64,images.shape[-1])
+        
         #获取patch_memory的图像索引
         def getindex(h,w,sh,sw,eh,ew):
             w = w//8
@@ -350,6 +354,20 @@ class PatchCore(torch.nn.Module):
             #print("h,w,sh,sw,eh,ew:",h,w,sh,sw,eh,ew)
             #print(index)
             return torch.tensor(index).cuda()
+        
+        def getimageindex(sh,sw,eh,ew):#得到图片索引,sh,sw,eh,ew是裁切后的图像原坐标（小坐标），不是扩充后的
+            index = []
+            
+            w = (ew-sw)//8
+            h = (eh-sh)//8
+            x = min(sw//8,8)
+            y = min(sh//8,8)
+            w_all = x + w + min((images.shape[-1]-ew)//8,8)
+            for i in range(y,y+h):
+                for j in range(x,x+w):
+                    index.append(i*w_all+j)
+            return torch.tensor(index).cuda()
+
 
         #print("starth,startw,width,height:",starth,startw,width,height)
         if height==-1:
@@ -358,25 +376,34 @@ class PatchCore(torch.nn.Module):
             width = images.shape[-1]
         #print(images.shape)
         
+        #得到裁切图像的坐标
         sh,sw,eh,ew,h,w = _getcoord(starth,startw,width,height)
+        #得到扩充后的裁切图像的坐标
+        padded_sh,padded_sw,padded_eh,padded_ew = _getboundedcoord(sh,sw,eh,ew)
+
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
 
         batchsize = images.shape[0]
 
         #裁切图像
-        eh,ew = min(eh,images.shape[-2]),min(ew,images.shape[-1])
-        cropped_image = images[:,:,sh:eh,sw:ew]
+        #eh,ew = min(eh,images.shape[-2]),min(ew,images.shape[-1])
+        #cropped_image = images[:,:,sh:eh,sw:ew]
+        cropped_image = images[:,:,padded_sh:padded_eh,padded_sw:padded_ew]
+
         #print(cropped_image.shape)#[1,3,w,h]
         index = getindex(images.shape[-2],images.shape[-1],sh,sw,eh,ew)
-
+        image_index = getimageindex(sh,sw,eh,ew)
+        print("image_index:",image_index)
+        print("index:",index)
         with torch.no_grad():
 
             #cal time
             start = time.time()
             #features, patch_shapes = self._embed(images, detach=False ,provide_patch_shapes=True)#patch_shape:[[397, 106], [199, 53]]
-            features,patch_shapes = self._embed(cropped_image, detach=False,provide_patch_shapes=True)
-            #print(patch_shapes)
+            features = self._embed(cropped_image, detach=False,provide_patch_shapes=False)
+            patch_shapes = [[(eh-sh)//8,(ew-sw)//8]]
+            print("patch_shapes:",patch_shapes)
             self.time['embed'].append(time.time()-start)
 
             #features = np.asarray(features) # 2x28x28=1568,1024
@@ -398,7 +425,7 @@ class PatchCore(torch.nn.Module):
             #features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
             #patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
 
-            distances = torch.norm(features-torch.index_select(patch_memory,0,index),dim=3)
+            distances = torch.norm(torch.index_select(features,0,image_index)-torch.index_select(patch_memory,0,index),dim=3)
             min_distances,_ = torch.min(distances,dim=1)
             self.time['predict_process'].append(time.time()-start)
 

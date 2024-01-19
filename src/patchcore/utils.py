@@ -53,7 +53,7 @@ def plot_segmentation_images(
         zip(image_paths, mask_paths, anomaly_scores, segmentations,boxpos),
         total=len(image_paths),
         desc="Generating Segmentation Images...",
-        leave=False,
+        leave=True,
     ):
         image = PIL.Image.open(image_path).convert("RGB")
         image = image_transform(image)
@@ -89,7 +89,7 @@ def plot_segmentation_images(
             
 
             if anomaly_score > threshold:
-                judgement = "anomaly"
+                judgement = "abnormal"
             else:
                 judgement = "normal"
             f.suptitle("anomaly score:" + str(anomaly_score) + " judgement:" + judgement, fontsize=30, y=1)
