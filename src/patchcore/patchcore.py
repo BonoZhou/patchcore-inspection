@@ -321,7 +321,7 @@ class PatchCore(torch.nn.Module):
         return scores, masks, labels_gt, masks_gt
 
 
-    def _predict(self, images,patch_memory=None,startw=0,starth=0,width=-1,height=-1):
+    def _predict(self, images,patch_memory=None,startw=0,starth=0,width=-1,height=-1,padding = 8, size = 8):
         """Infer score and mask for a batch of images."""
 
         #按块裁切图像
@@ -334,22 +334,22 @@ class PatchCore(torch.nn.Module):
                 if isinstance(x,torch.Tensor):
                     return int(torch.floor(x))
                 else: return int(torch.tensor([x]).floor().item())
-            sh = floor(starth/8)
-            sw = floor(startw/8)
-            eh = ceil((starth+height)/8)
-            ew = ceil((startw+width)/8)
-            return 8*sh,8*sw,8*eh,8*ew,8*(eh-sh),8*(ew-sw)
+            sh = floor(starth/size)
+            sw = floor(startw/size)
+            eh = ceil((starth+height)/size)
+            ew = ceil((startw+width)/size)
+            return size*sh,size*sw,size*eh,size*ew,size*(eh-sh),size*(ew-sw)
         
         #获取扩充后的裁切图像的坐标
         def _getboundedcoord(sh,sw,eh,ew):
-            return max(0,sh-64),max(0,sw-64),min(eh+64,images.shape[-2]),min(ew+64,images.shape[-1])
+            return max(0,sh-padding*size),max(0,sw-padding*size),min(eh+padding*size,images.shape[-2]),min(ew+padding*size,images.shape[-1])
         
         #获取patch_memory的图像索引
         def getindex(h,w,sh,sw,eh,ew):
-            w = w//8
+            w = w//size
             index = []
-            for i in range(sh//8,eh//8):
-                for j in range(sw//8,ew//8):
+            for i in range(sh//size,eh//size):
+                for j in range(sw//size,ew//size):
                     index.append(i*w+j)
             #print("h,w,sh,sw,eh,ew:",h,w,sh,sw,eh,ew)
             #print(index)
@@ -358,11 +358,11 @@ class PatchCore(torch.nn.Module):
         def getimageindex(sh,sw,eh,ew):#得到图片索引,sh,sw,eh,ew是裁切后的图像原坐标（小坐标），不是扩充后的
             index = []
             
-            w = (ew-sw)//8
-            h = (eh-sh)//8
-            x = min(sw//8,8)
-            y = min(sh//8,8)
-            w_all = x + w + min((images.shape[-1]-ew)//8,8)
+            w = (ew-sw)//size
+            h = (eh-sh)//size
+            x = min(sw//size,padding)
+            y = min(sh//size,padding)
+            w_all = x + w + min((images.shape[-1]-ew)//size,padding)
             for i in range(y,y+h):
                 for j in range(x,x+w):
                     index.append(i*w_all+j)
@@ -394,16 +394,16 @@ class PatchCore(torch.nn.Module):
         #print(cropped_image.shape)#[1,3,w,h]
         index = getindex(images.shape[-2],images.shape[-1],sh,sw,eh,ew)
         image_index = getimageindex(sh,sw,eh,ew)
-        print("image_index:",image_index)
-        print("index:",index)
+        #print("image_index:",image_index)
+        #print("index:",index)
         with torch.no_grad():
 
             #cal time
             start = time.time()
             #features, patch_shapes = self._embed(images, detach=False ,provide_patch_shapes=True)#patch_shape:[[397, 106], [199, 53]]
             features = self._embed(cropped_image, detach=False,provide_patch_shapes=False)
-            patch_shapes = [[(eh-sh)//8,(ew-sw)//8]]
-            print("patch_shapes:",patch_shapes)
+            patch_shapes = [[(eh-sh)//size,(ew-sw)//size]]
+            #print("patch_shapes:",patch_shapes)
             self.time['embed'].append(time.time()-start)
 
             #features = np.asarray(features) # 2x28x28=1568,1024
