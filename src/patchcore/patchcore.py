@@ -13,6 +13,7 @@ import patchcore.backbones
 import patchcore.common
 import patchcore.sampler
 import time
+from torchvision.transforms import Pad
 LOGGER = logging.getLogger(__name__)
 
 
@@ -159,7 +160,9 @@ class PatchCore(torch.nn.Module):
                 *perm_base_shape[:-2], ref_num_patches[0], ref_num_patches[1]
             )
             _features = _features.permute(0, -2, -1, 1, 2, 3)
+            #print(_features.shape)#[1, h//8, w//8, 1024, 3, 3]
             _features = _features.reshape(len(_features), -1, *_features.shape[-3:])
+            #print(_features.shape)#[1, 42082, 1024, 3, 3]
             features[i] = _features
         features = [x.reshape(-1, *x.shape[-3:]) for x in features]
         # print(features[0].shape,features[1].shape) torch.Size([1568, 512, 3, 3]) torch.Size([1568, 1024, 3, 3])
@@ -198,6 +201,7 @@ class PatchCore(torch.nn.Module):
             with torch.no_grad():
                 input_image = input_image.to(torch.float).to(self.device)
                 return self._embed(input_image)
+        
 
         features = []
         with tqdm.tqdm(
@@ -206,15 +210,34 @@ class PatchCore(torch.nn.Module):
             for image in data_iterator:
                 if isinstance(image, dict):
                     image = image["image"]
-                
+                h=image.shape[-2]//8
+                w=image.shape[-1]//8
                 batchsize = image.shape[0] # 2
-                
+                #print("image:",image.shape)
                 feature_batch_image = np.array(_image_to_features(image))
+                
                 feature_batch_image = feature_batch_image.reshape(batchsize,-1,feature_batch_image.shape[-1]) # 2,-1,1024
-
+                #print("feature_batch_image:",feature_batch_image.shape) # 2,1568,1024
                 features.append(feature_batch_image)
-
+            print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
+        #print("features:",features.shape) # (28, h/8, w/8, 1024)
+        features = features.reshape(-1,h,w,features.shape[-1]) 
+        print("features:",features.shape)
+        features = torch.Tensor(features).cuda().permute(0, 3, 1, 2)# (28 ,1024, h/8, w/8)
+        padder = Pad(padding=1, fill=0, padding_mode='edge')
+        padded_features = padder(features)
+        for i in [-1,0,1]:
+            for j in [-1,0,1]:
+                if i==0 and j==0:
+                    continue
+                print("padded_features:",padded_features[:, :, 1+i:h+i+1, 1+j:w+j+1].shape)
+                features = torch.cat((features,padded_features[:, :, 1+i:h+i+1, 1+j:w+j+1]),dim=0)
+
+        print("padded_features:",padded_features.shape)
+
+        print("features:",features.shape)
+
         self.features = torch.Tensor(features.transpose(1,0,2)) # 784,209,1024
         # self.anomaly_scorer.fit(detection_features=[features])
 

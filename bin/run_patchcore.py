@@ -142,6 +142,7 @@ def run(
             print("segmentations: ", segmentations.shape)
             # 对于每一张图像
             _segmentationthreshold = []
+            _segmentationindex = []
             for i in range(segmentations.shape[0]):
                 # 获取当前图像
                 image = segmentations[i]
@@ -152,12 +153,14 @@ def run(
                 # 计算非零元素的均值和最大值
                 mean_value = np.mean(nonzero_elements)
                 max_value = np.max(nonzero_elements)
+                max_value_index = np.argmax(image)
 
                 # 计算最高的90%和95%的值
                 #value_90 = np.percentile(nonzero_elements, 90)
                 #value_95 = np.percentile(nonzero_elements, 95)
                 #value_99 = np.percentile(nonzero_elements, 99)
                 _segmentationthreshold.append(max_value)
+                _segmentationindex.append(max_value_index)
 
                 #print("Image", i, "mean_value: ", mean_value, "max_value: ", max_value, "90% value: ", value_90, "95% value: ", value_95 , "99% value: ", value_99)
             
@@ -273,6 +276,13 @@ def run(
             met['auroc'] = [met['auroc']]
         max_len = max(len(lst) for lst in met.values())
 
+        segmentationmet = {
+            "image_path": image_paths,
+            "segmentationthreshold": _segmentationthreshold, 
+            "anomaly_labels": anomaly_labels, "scores": scores
+            }
+
+
         with open(patchcore_save_path+'logfile.csv', 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=met.keys())
             writer.writeheader()
@@ -280,6 +290,15 @@ def run(
             for i in range(max_len):
                 row = {key: (value[i] if i < len(value) else '') for key, value in met.items()}
                 writer.writerow(row)
+        '''
+        输出segementation的阈值
+        '''
+        with open(patchcore_save_path+'logfile.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)    
+            max_len = max(len(lst) for lst in segmentationmet.values())
+            for i in range(len(image_paths)):
+                writer.writerow([image_paths[i], _segmentationthreshold[i],_segmentationindex[i]])
+
         LOGGER.info("\n\n-----\n")
 
     # Store all results and mean scores to a csv-file.
