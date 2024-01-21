@@ -251,7 +251,7 @@ class PatchCore(torch.nn.Module):
         features = features.reshape(features.shape[0],-1)
         features = self.featuresampler.run(features)
         print("features:",features.shape)
-        features = features.reshape(-1,h,w,1024)
+        features = features.reshape(features.shape[0],-1,1024)
         self.features = torch.Tensor(features.transpose(1,0,2)) # 784,209,1024
         #self.anomaly_scorer.fit(detection_features=[features])
         #reduced_features = self.featuresampler._reduce_features(torch.Tensor(features).cuda())
