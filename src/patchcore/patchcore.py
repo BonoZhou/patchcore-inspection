@@ -221,7 +221,17 @@ class PatchCore(torch.nn.Module):
                 features.append(feature_batch_image)
             print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
+        #print(type(self.featuresampler))
+        #sampler
+        #features = self.featuresampler._compute_greedy_coreset_indices(torch.Tensor(features).cuda())
         #print("features:",features.shape) # (28, h/8, w/8, 1024)
+        
+
+
+        
+
+
+        '''
         features = features.reshape(-1,h,w,features.shape[-1]) 
         print("features:",features.shape)
         features = torch.Tensor(features).cuda().permute(0, 3, 1, 2)# (28 ,1024, h/8, w/8)
@@ -233,13 +243,20 @@ class PatchCore(torch.nn.Module):
                     continue
                 print("padded_features:",padded_features[:, :, 1+i:h+i+1, 1+j:w+j+1].shape)
                 features = torch.cat((features,padded_features[:, :, 1+i:h+i+1, 1+j:w+j+1]),dim=0)
-
+        
         print("padded_features:",padded_features.shape)
-
+        '''
         print("features:",features.shape)
-
+        print("percentage",self.featuresampler.percentage)
+        features = features.reshape(features.shape[0],-1)
+        features = self.featuresampler.run(features)
+        print("features:",features.shape)
+        features = features.reshape(-1,h,w,1024)
         self.features = torch.Tensor(features.transpose(1,0,2)) # 784,209,1024
-        # self.anomaly_scorer.fit(detection_features=[features])
+        #self.anomaly_scorer.fit(detection_features=[features])
+        #reduced_features = self.featuresampler._reduce_features(torch.Tensor(features).cuda())
+        #features = self.featuresampler._compute_greedy_coreset_indices(reduced_features)
+        
 
 
     @staticmethod
@@ -303,6 +320,7 @@ class PatchCore(torch.nn.Module):
         labels_gt = []
         masks_gt = []
         patch_memory = self.features.unsqueeze(2).cuda() # -1,209,1,1024
+        print("patch_memory:",patch_memory.shape)
 
         #time calculate
         inft = []
