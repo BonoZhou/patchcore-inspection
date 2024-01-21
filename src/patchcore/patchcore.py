@@ -271,7 +271,11 @@ class PatchCore(torch.nn.Module):
         features = features.reshape(features.shape[0],-1,1024)
         features = padfeatures(h,w,features)
         print("features padded:",features.shape)
-        self.features = torch.Tensor(features.transpose(1,0,2)) # 784,209,1024
+        features = features.reshape(features.shape[0],features.shape[1],-1)# n,1024,h*w/64
+        features = features.permute(2,0,1) # h*w/64,n,1024
+
+        print("features out:",features.shape)
+        self.features = features # 784,209,1024
         #self.anomaly_scorer.fit(detection_features=[features])
         #reduced_features = self.featuresampler._reduce_features(torch.Tensor(features).cuda())
         #features = self.featuresampler._compute_greedy_coreset_indices(reduced_features)
