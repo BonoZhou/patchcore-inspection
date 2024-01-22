@@ -225,9 +225,9 @@ class PatchCore(torch.nn.Module):
             for image in data_iterator:
                 if isinstance(image, dict):
                     image = image["image"]
-                h=image.shape[-2]//8
-                w=image.shape[-1]//8
-                batchsize = image.shape[0] # 2
+                #h=image.shape[-2]//8
+                #w=image.shape[-1]//8
+                batchsize = image.shape[0] # 1
                 #print("image:",image.shape)
                 feature_batch_image = np.array(_image_to_features(image))
                 
@@ -236,6 +236,7 @@ class PatchCore(torch.nn.Module):
                 features.append(feature_batch_image)
             print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
+        self.features = torch.Tensor(features.transpose(1,0,2))
         #print(type(self.featuresampler))
         #sampler
         #features = self.featuresampler._compute_greedy_coreset_indices(torch.Tensor(features).cuda())
@@ -261,21 +262,21 @@ class PatchCore(torch.nn.Module):
         
         print("padded_features:",padded_features.shape)
         '''
-        print("features:",features.shape)
-        print("percentage",self.featuresampler.percentage)
-        features = features.reshape(features.shape[0],-1)
-        features = self.featuresampler.run(features)
+        #print("features:",features.shape)(28, h/8* w/8, 1024)
+        #print("percentage",self.featuresampler.percentage)
+        #features = features.reshape(features.shape[0],-1)
+        #features = self.featuresampler.run(features)
 
 
-        print("features:",features.shape)
-        features = features.reshape(features.shape[0],-1,1024)
-        features = padfeatures(h,w,features)
-        print("features padded:",features.shape)
-        features = features.reshape(features.shape[0],features.shape[1],-1)# n,1024,h*w/64
-        features = features.permute(2,0,1) # h*w/64,n,1024
+        #print("features:",features.shape)
+        #features = features.reshape(features.shape[0],-1,1024)
+        #features = padfeatures(h,w,features)
+        #print("features padded:",features.shape)
+        #features = features.reshape(features.shape[0],features.shape[1],-1)# n,1024,h*w/64
+        #features = features.permute(2,0,1) # h*w/64,n,1024
 
-        print("features out:",features.shape)
-        self.features = features # 784,209,1024
+        #print("features out:",features.shape)
+        #self.features = features # 784,209,1024
         #self.anomaly_scorer.fit(detection_features=[features])
         #reduced_features = self.featuresampler._reduce_features(torch.Tensor(features).cuda())
         #features = self.featuresampler._compute_greedy_coreset_indices(reduced_features)
