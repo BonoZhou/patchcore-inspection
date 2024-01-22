@@ -489,7 +489,8 @@ class PatchCore(torch.nn.Module):
             
             #features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
             #patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
-            if len(index) < (width*height)//64:
+            #print(patch_memory.shape[0])
+            if len(index) < patch_memory.shape[0]:
                 distances = torch.norm(torch.index_select(features,0,image_index)-torch.index_select(patch_memory,0,index),dim=3)
             else:
                 distances = torch.norm(features-patch_memory,dim=3)
