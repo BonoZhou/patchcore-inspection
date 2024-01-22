@@ -157,9 +157,9 @@ def run(
 
                 # 计算最高的90%和95%的值
                 #value_90 = np.percentile(nonzero_elements, 90)
-                #value_95 = np.percentile(nonzero_elements, 95)
+                value_95 = np.percentile(nonzero_elements, 95)
                 #value_99 = np.percentile(nonzero_elements, 99)
-                _segmentationthreshold.append(max_value)
+                _segmentationthreshold.append(value_95)
                 _segmentationindex.append(max_value_index)
 
                 #print("Image", i, "mean_value: ", mean_value, "max_value: ", max_value, "90% value: ", value_90, "95% value: ", value_95 , "99% value: ", value_99)
@@ -168,7 +168,7 @@ def run(
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
-            threshold = np.max(scores[np.logical_not(anomaly_labels)])
+            threshold = np.percentile(scores[np.logical_not(anomaly_labels)],95)
             _segmentationthreshold = np.array(_segmentationthreshold)
             segmentationthreshold = np.max(_segmentationthreshold[np.logical_not(anomaly_labels)])
             # (Optional) Plot example images.
