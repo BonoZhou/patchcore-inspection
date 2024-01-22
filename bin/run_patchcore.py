@@ -157,9 +157,9 @@ def run(
 
                 # 计算最高的90%和95%的值
                 #value_90 = np.percentile(nonzero_elements, 90)
-                value_95 = np.percentile(nonzero_elements, 95)
+                #value_95 = np.percentile(nonzero_elements, 95)
                 #value_99 = np.percentile(nonzero_elements, 99)
-                _segmentationthreshold.append(value_95)
+                _segmentationthreshold.append(max_value)
                 _segmentationindex.append(max_value_index)
 
                 #print("Image", i, "mean_value: ", mean_value, "max_value: ", max_value, "90% value: ", value_90, "95% value: ", value_95 , "99% value: ", value_99)
@@ -171,7 +171,12 @@ def run(
             ]
             threshold = np.percentile(scores[np.logical_not(anomaly_labels)],90)
             print("threshold",threshold)
+            for i in [80,90,95,99]:
+                print(i,"percent threshold:",np.percentile(scores[np.logical_not(anomaly_labels)],i))
             _segmentationthreshold = np.array(_segmentationthreshold)
+
+            for i in [80,90,95,99]:
+                print(i,"percent segmentationthreshold:",np.percentile(_segmentationthreshold[np.logical_not(anomaly_labels)],i))
             segmentationthreshold = np.max(_segmentationthreshold[np.logical_not(anomaly_labels)])
             # (Optional) Plot example images.
             if save_segmentation_images:
