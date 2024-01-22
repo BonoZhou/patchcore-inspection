@@ -163,12 +163,14 @@ def run(
                 _segmentationindex.append(max_value_index)
 
                 #print("Image", i, "mean_value: ", mean_value, "max_value: ", max_value, "90% value: ", value_90, "95% value: ", value_95 , "99% value: ", value_99)
-            
+            #print("scores:",scores.shape)
             scores = np.mean(scores, axis=0)
+            #print("scores:",scores.shape)#n,
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
-            threshold = np.percentile(scores[np.logical_not(anomaly_labels)],95)
+            threshold = np.percentile(scores[np.logical_not(anomaly_labels)],90)
+            print("threshold",threshold)
             _segmentationthreshold = np.array(_segmentationthreshold)
             segmentationthreshold = np.max(_segmentationthreshold[np.logical_not(anomaly_labels)])
             # (Optional) Plot example images.
