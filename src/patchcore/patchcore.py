@@ -14,6 +14,7 @@ import patchcore.common
 import patchcore.sampler
 import time
 from torchvision.transforms import Pad
+from scipy.stats import chi2
 LOGGER = logging.getLogger(__name__)
 
 
@@ -276,6 +277,7 @@ class PatchCore(torch.nn.Module):
 
         #计算均值和方差
         self.normalizationfeature = self.normalizefeature(self.features.cuda())#hxw,n,1024
+        print(self.compute_mahalanobis_threshold(1024, p=0.9973))
         #print(type(self.featuresampler))
         #sampler
         #features = self.featuresampler._compute_greedy_coreset_indices(torch.Tensor(features).cuda())
@@ -320,7 +322,18 @@ class PatchCore(torch.nn.Module):
         #reduced_features = self.featuresampler._reduce_features(torch.Tensor(features).cuda())
         #features = self.featuresampler._compute_greedy_coreset_indices(reduced_features)
         
+    @staticmethod
+    def compute_mahalanobis_threshold(
+        k: int, p: float = 0.9973
+    ) -> torch.Tensor:
+        """Compute a threshold on the mahalanobis distance.
 
+        So that the probability of mahalanobis with k dimensions being less
+        than the returned threshold is p.
+        """
+        # Mahalanobis² is Chi² distributed with k degrees of freedom.
+        # So t is square root of the inverse cdf at p.
+        return torch.Tensor([chi2.ppf(p, k)]).sqrt()
 
     @staticmethod
     def euclidean_dist(x: Tensor, y: Tensor) -> Tensor:
