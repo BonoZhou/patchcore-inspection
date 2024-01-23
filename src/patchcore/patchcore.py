@@ -90,11 +90,13 @@ class PatchCore(torch.nn.Module):
                      'predict_tocpu':[]} # time calculate
         self.normalizationfeature = None
 
-#计算均值和方差
+    #计算均值和标准差
     def normalizefeature(self,feature: Tensor) -> Tensor:#input: hxw,n,1024
         assert feature.ndim == 3
         mean = feature.mean(dim=1)
         std = feature.std(dim=1)
+        epsilon = 1e-8
+        std = std + epsilon
         return mean,std
         #output: hxw,1024
 
@@ -103,16 +105,28 @@ class PatchCore(torch.nn.Module):
         if self.normalizationfeature is None:
             distances = torch.norm(features-patch_memory,dim=3)
             min_distances,_ = torch.min(distances,dim=1)
-            return min_distances#output: hxw,batchsize,1024
+            #print(min_distances.shape)
+            return min_distances#output: hxw,batchsize
         else:
             mean,std = self.normalizationfeature#hxw,1024
             mean = mean.unsqueeze(1)
             std = std.unsqueeze(1)
             features = features.squeeze(1)
+            has_zero = torch.any(std.eq(0))
+            print("std:::",has_zero)
+
+
             if index is None:           
                 return torch.norm((features - mean)/std,dim=2)
             else:
-                return torch.norm((features - torch.index_select(mean,dim=0,index=index))/torch.index_select(std,dim=0,index=index),dim=2)    
+                indexed_mean = torch.index_select(mean,dim=0,index=index)
+                indexed_std = torch.index_select(std,dim=0,index=index)
+                normed = (features - indexed_mean)/indexed_std
+                #print("diss:::::::",torch.norm(((features - indexed_mean)/indexed_std),dim=2))
+                print("normed:",normed.shape)
+                print("normed:",torch.isnan(normed).any())
+                print("normed:",torch.isinf(normed).any())
+                return torch.norm(normed,dim=2)    
 
 
 
@@ -265,6 +279,8 @@ class PatchCore(torch.nn.Module):
             print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
         self.features = torch.Tensor(features.transpose(1,0,2))
+
+        #计算均值和方差
         self.normalizationfeature = self.normalizefeature(self.features.cuda())#hxw,n,1024
         #print(type(self.featuresampler))
         #sampler
