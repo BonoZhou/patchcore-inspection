@@ -88,6 +88,34 @@ class PatchCore(torch.nn.Module):
                      'embed_detach':[],
                      'predict_postprocessing':[],
                      'predict_tocpu':[]} # time calculate
+        self.normalizationfeature = None
+
+#计算均值和方差
+    def normalizefeature(self,feature: Tensor) -> Tensor:#input: hxw,n,1024
+        assert feature.ndim == 3
+        mean = feature.mean(dim=1)
+        std = feature.std(dim=1)
+        return mean,std
+        #output: hxw,1024
+
+    #计算最短距离
+    def min_distance(self,features: Tensor,patch_memory: Tensor,index = None) -> Tensor:#input: hxw,n,batchsize,1024
+        if self.normalizationfeature is None:
+            distances = torch.norm(features-patch_memory,dim=3)
+            min_distances,_ = torch.min(distances,dim=1)
+            return min_distances#output: hxw,batchsize,1024
+        else:
+            mean,std = self.normalizationfeature#hxw,1024
+            mean = mean.unsqueeze(1)
+            std = std.unsqueeze(1)
+            features = features.squeeze(1)
+            if index is None:           
+                return torch.norm((features - mean)/std,dim=2)
+            else:
+                return torch.norm((features - torch.index_select(mean,dim=0,index=index))/torch.index_select(std,dim=0,index=index),dim=2)    
+
+
+
 
 
     def embed(self, data):
@@ -237,6 +265,7 @@ class PatchCore(torch.nn.Module):
             print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
         self.features = torch.Tensor(features.transpose(1,0,2))
+        self.normalizationfeature = self.normalizefeature(self.features.cuda())#hxw,n,1024
         #print(type(self.featuresampler))
         #sampler
         #features = self.featuresampler._compute_greedy_coreset_indices(torch.Tensor(features).cuda())
@@ -490,11 +519,11 @@ class PatchCore(torch.nn.Module):
             #features = features.expand(-1,patch_memory.shape[1],-1,-1) # -1,209,2,1024
             #patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
             #print(patch_memory.shape[0])
+            #计算距离
             if len(index) < patch_memory.shape[0]:
-                distances = torch.norm(torch.index_select(features,0,image_index)-torch.index_select(patch_memory,0,index),dim=3)
+                min_distances = self.min_distance(torch.index_select(features,0,image_index),torch.index_select(patch_memory,0,index),index)
             else:
-                distances = torch.norm(features-patch_memory,dim=3)
-            min_distances,_ = torch.min(distances,dim=1)
+                min_distances = self.min_distance(features,patch_memory)
             self.time['predict_process'].append(time.time()-start)
 
             start = time.time()
