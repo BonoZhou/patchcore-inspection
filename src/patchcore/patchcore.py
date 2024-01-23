@@ -112,8 +112,6 @@ class PatchCore(torch.nn.Module):
             mean = mean.unsqueeze(1)
             std = std.unsqueeze(1)
             features = features.squeeze(1)
-            has_zero = torch.any(std.eq(0))
-            print("std:::",has_zero)
 
 
             if index is None:           
@@ -122,10 +120,6 @@ class PatchCore(torch.nn.Module):
                 indexed_mean = torch.index_select(mean,dim=0,index=index)
                 indexed_std = torch.index_select(std,dim=0,index=index)
                 normed = (features - indexed_mean)/indexed_std
-                #print("diss:::::::",torch.norm(((features - indexed_mean)/indexed_std),dim=2))
-                print("normed:",normed.shape)
-                print("normed:",torch.isnan(normed).any())
-                print("normed:",torch.isinf(normed).any())
                 return torch.norm(normed,dim=2)    
 
 
