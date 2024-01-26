@@ -32,5 +32,5 @@ def process_images(directory, new_directory):
                 new_filename = f"{base_name}_sft_{x_shift}_{y_shift}_clr_{rchange}_{gchange}_{bchange}{ext}"
                 new_path = os.path.join(new_directory, new_filename)
                 img.save(new_path)
-# Example usage:
+# Example usage
 process_images(r"D:\hust\MediaLab\IAD\Anomalib\patchcore-inspection\data\MVTec\fu\train\good", r"D:\hust\MediaLab\IAD\Anomalib\patchcore-inspection\data\MVTec\fu\train\good_processed")
