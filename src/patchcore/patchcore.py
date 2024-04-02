@@ -41,7 +41,7 @@ class PatchCore(torch.nn.Module):
         self.backbone = backbone.to(device)
         self.layers_to_extract_from = layers_to_extract_from
         self.input_shape = input_shape
-
+        torch.save(self.backbone, 'backbone0.pth')
         self.device = device
         self.patch_maker = PatchMaker(patchsize, stride=patchstride)
 
@@ -50,6 +50,7 @@ class PatchCore(torch.nn.Module):
         feature_aggregator = patchcore.common.NetworkFeatureAggregator(
             self.backbone, self.layers_to_extract_from, self.device
         )
+        torch.save(self.backbone, './backbone1.pth')
         feature_dimensions = feature_aggregator.feature_dimensions(input_shape)
         # print(input_shape,feature_dimensions)
         self.forward_modules["feature_aggregator"] = feature_aggregator
@@ -57,6 +58,7 @@ class PatchCore(torch.nn.Module):
         preprocessing = patchcore.common.Preprocessing(
             feature_dimensions, pretrain_embed_dimension
         )
+        torch.save(self.backbone, 'backbone2.pth')
         self.forward_modules["preprocessing"] = preprocessing
 
         self.target_embed_dimension = target_embed_dimension
@@ -75,6 +77,7 @@ class PatchCore(torch.nn.Module):
         self.anomaly_segmentor = patchcore.common.RescaleSegmentor(
             device=self.device, target_size=input_shape[-2:]
         )
+        torch.save(self.backbone, 'backbone3.pth')
 
         self.featuresampler = featuresampler
         self.features = None
@@ -224,6 +227,7 @@ class PatchCore(torch.nn.Module):
         ) as data_iterator:
             for image in data_iterator:
                 if isinstance(image, dict):
+                    name = image["image_path"]
                     image = image["image"]
                 #h=image.shape[-2]//8
                 #w=image.shape[-1]//8
@@ -232,7 +236,10 @@ class PatchCore(torch.nn.Module):
                 feature_batch_image = np.array(_image_to_features(image))
                 
                 feature_batch_image = feature_batch_image.reshape(batchsize,-1,feature_batch_image.shape[-1]) # 2,-1,1024
-                #print("feature_batch_image:",feature_batch_image.shape) # 2,1568,1024
+                print("feature_batch_image:",feature_batch_image.shape) # 2,1568,1024
+                print("name:",name)
+                savepath = name[0] + '.pt'
+                torch.save(feature_batch_image,savepath)
                 features.append(feature_batch_image)
             print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
@@ -361,6 +368,7 @@ class PatchCore(torch.nn.Module):
                     masks_gt.extend(image["mask"].numpy().tolist())
                     pos = image["defectpos"]
                     image = image["image"]
+                    print("imgshape:::",image.shape)
                 if len(pos)==0:    
                     _scores, _masks = self._predict(image,patch_memory=patch_memory)
                 else:
@@ -493,7 +501,9 @@ class PatchCore(torch.nn.Module):
             if len(index) < patch_memory.shape[0]:
                 distances = torch.norm(torch.index_select(features,0,image_index)-torch.index_select(patch_memory,0,index),dim=3)
             else:
+                
                 distances = torch.norm(features-patch_memory,dim=3)
+                print("*******distance:",distances.shape)
             min_distances,_ = torch.min(distances,dim=1)
             self.time['predict_process'].append(time.time()-start)
 
