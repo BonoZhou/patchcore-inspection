@@ -83,7 +83,7 @@ def plot_segmentation_images(
             f, axes = plt.subplots(1, 4 + int(masks_provided))
 
         
-            superimpose = superimpose_anomaly_map(segmentation, image.transpose(1, 2, 0))
+            superimpose = superimpose_anomaly_map(segmentation * 3.0, image.transpose(1, 2, 0))
             mask = compute_mask(segmentation, segmentationthreshold)
             boundary = mark_boundaries(image.transpose(1, 2, 0), mask, color=(1, 0, 0),mode='thick')
             
@@ -101,7 +101,7 @@ def plot_segmentation_images(
                 axes[0].add_patch(rect)
             axes[1].imshow(superimpose)
             axes[1].axis('off')
-            axes[2].imshow(segmentation,vmin=0,vmax=1)
+            axes[2].imshow(segmentation,vmin=0,vmax=0.3)
             axes[2].axis('off')
             axes[3].imshow(mask, cmap='gray')#mask为黑白图，需要用灰度图显示
             axes[3].axis('off')

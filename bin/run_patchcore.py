@@ -323,7 +323,7 @@ def run(
 @main.command("patch_core")
 # Pretraining-specific parameters.
 @click.option("--backbone_names", "-b", type=str, multiple=True, default=["wideresnet50"])
-@click.option("--layers_to_extract_from", "-le", type=str, multiple=True, default=["layer2","layer3"])
+@click.option("--layers_to_extract_from", "-le", type=str, multiple=True, default=["layer2","layer3",'layer4'])
 # Parameters for Glue-code (to merge different parts of the pipeline.
 @click.option("--pretrain_embed_dimension", type=int, default=1024)
 @click.option("--target_embed_dimension", type=int, default=1024)
