@@ -71,20 +71,29 @@ class MVTecDataset(torch.utils.data.Dataset):
         self.transform_mean = IMAGENET_MEAN
         self.transform_std = IMAGENET_STD
         self.imgpaths_per_class, self.data_to_iterate = self.get_image_data()
-
-        self.transform_img = [
-            transforms.Resize(resize),
-            transforms.CenterCrop(imagesize),
+        if resize == [0,0]:
+            self.transform_img = [
             transforms.ToTensor(),
             transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         ]
+        else:
+            self.transform_img = [
+                transforms.Resize(resize),
+                transforms.CenterCrop(imagesize),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+            ]
         self.transform_img = transforms.Compose(self.transform_img)
-
-        self.transform_mask = [
-            transforms.Resize(resize),
-            transforms.CenterCrop(imagesize),
+        if resize == [0,0]:
+            self.transform_mask = [
             transforms.ToTensor(),
         ]
+        else:
+            self.transform_mask = [
+                transforms.Resize(resize),
+                transforms.CenterCrop(imagesize),
+                transforms.ToTensor(),
+            ]
         self.transform_mask = transforms.Compose(self.transform_mask)
 
         self.imagesize = (3, imagesize[0], imagesize[1])

@@ -299,3 +299,34 @@ def compute_and_store_final_results(
 
     mean_metrics = {"mean_{0}".format(key): item for key, item in mean_metrics.items()}
     return mean_metrics
+
+
+def getscoredistribution(segmentations, savefolder,distance_method = 'norm'):
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置字体为SimHei支持中文
+    plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
+
+    # 将张量展平，以便绘制所有值的分布
+    segmentations_flattened = segmentations.flatten()
+    threshold = segmentations.mean() + 3 * segmentations.std()
+    abnormal_score = segmentations_flattened[segmentations_flattened > threshold]
+
+    fig, ax1 = plt.subplots()
+
+    # 绘制正常值的分布
+    color = 'tab:blue'
+    ax1.set_xlabel('分数')
+    ax1.set_ylabel('正常值频率', color=color)
+    ax1.hist(segmentations_flattened, bins=100, alpha=0.75, color=color)
+    ax1.tick_params(axis='y', labelcolor=color)
+
+    # 创建一个共享X轴的次坐标轴
+    ax2 = ax1.twinx()  
+    color = 'tab:red'
+    ax2.set_ylabel('异常值频率', color=color)  
+    ax2.hist(abnormal_score, bins=100, alpha=0.75, color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+
+    plt.title('分数分布')
+    fig.tight_layout()  # 调整布局以防止标签重叠
+    plt.savefig(savefolder + f'\\score_distribution_' + distance_method + '.png')
+    return

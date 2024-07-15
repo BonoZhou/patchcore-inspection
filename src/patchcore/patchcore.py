@@ -36,12 +36,13 @@ class PatchCore(torch.nn.Module):
         anomaly_score_num_nn=1,
         featuresampler=patchcore.sampler.IdentitySampler(),
         nn_method=patchcore.common.FaissNN(False, 4),
+        distance_method="norm",
         **kwargs,
     ):
         self.backbone = backbone.to(device)
         self.layers_to_extract_from = layers_to_extract_from
         self.input_shape = input_shape
-        torch.save(self.backbone, 'backbone0.pth')
+        self.distance_method = distance_method
         self.device = device
         self.patch_maker = PatchMaker(patchsize, stride=patchstride)
 
@@ -397,10 +398,17 @@ class PatchCore(torch.nn.Module):
     def _predict(self, images,patch_memory=None,startw=0,starth=0,width=-1,height=-1,padding = 8, size = 4):
         """Infer score and mask for a batch of images."""
         def distance(x,y):
-            return torch.norm(x-y,dim=3)
-            return torch.abs(t1 - t2).sum(3)
-            return torch.abs(t1 - t2).max(3).values
-            return 1 - torch.nn.functional.cosine_similarity(t1, t2, 3)
+            if self.distance_method == "norm":
+                return torch.norm(x-y,dim=3)
+            elif self.distance_method == "cosine":
+                return 1 - torch.nn.functional.cosine_similarity(x, y, 3)
+            elif self.distance_method == "sum":
+                return torch.abs(x - y).sum(3)
+            elif self.distance_method == "max":
+                return torch.abs(x - y).max(3).values
+            else:
+                return torch.norm(x-y,dim=3)
+            
 
 
         #按块裁切图像

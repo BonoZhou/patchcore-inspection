@@ -78,7 +78,7 @@ def run(
 
         with device_context:
             torch.cuda.empty_cache()
-            imagesize = dataloaders["training"].dataset.imagesize
+            #imagesize = dataloaders["training"].dataset.imagesize
             sampler = methods["get_sampler"](
                 device,
             )
@@ -124,6 +124,7 @@ def run(
             scores = np.mean(scores, axis=0)
             '''
             segmentations = np.array(aggregator["segmentations"])
+            patchcore.utils.getscoredistribution(segmentations,run_save_path,distance_method=PatchCore.distance_method)
             min_scores = (
                 segmentations.reshape(len(segmentations), -1)
                 .min(axis=-1)
@@ -134,12 +135,13 @@ def run(
                 .max(axis=-1)
                 .reshape(-1, 1, 1, 1)
             )
-            segmentations = (segmentations - min_scores) / (max_scores - min_scores) * 2
+            segmentations = (segmentations - min_scores) / (max_scores - min_scores)
             segmentations = np.mean(segmentations, axis=0)
             
             #segmentations = np.array(aggregator["segmentations"])
             #segmentations = np.mean(segmentations, axis=0)
             print("segmentations: ", segmentations.shape)
+            
             # 对于每一张图像
             _segmentationthreshold = []
             _segmentationindex = []
@@ -339,6 +341,7 @@ def run(
 # NN on GPU.
 @click.option("--faiss_on_gpu", is_flag=True, default=True)
 @click.option("--faiss_num_workers", type=int, default=8)
+@click.option("--distance_method", type=str, default="norm")
 def patch_core(
     backbone_names,
     layers_to_extract_from,
@@ -353,6 +356,7 @@ def patch_core(
     patchsize_aggregate,
     faiss_on_gpu,
     faiss_num_workers,
+    distance_method,
 ):
     backbone_names = list(backbone_names)
     if len(backbone_names) > 1:
@@ -391,6 +395,7 @@ def patch_core(
                 featuresampler=sampler,
                 anomaly_scorer_num_nn=anomaly_scorer_num_nn,
                 nn_method=nn_method,
+                distance_method=distance_method,
             )
             loaded_patchcores.append(patchcore_instance)
         return loaded_patchcores
@@ -420,7 +425,7 @@ def sampler(name, percentage):
 @click.option("--train_val_split", type=float, default=1, show_default=True)
 @click.option("--batch_size", default=1, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
-@click.option("--resize", default="256,256", type=str, show_default=True)
+@click.option("--resize", default="0,0", type=str, show_default=True)
 @click.option("--imagesize", default="", type=str, show_default=True)
 @click.option("--augment", is_flag=True)
 def dataset(
