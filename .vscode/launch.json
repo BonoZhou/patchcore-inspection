@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Run PatchCore",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/run_patchcore.py",
+            "args": [
+                "--save_patchcore_model",
+                "--save_segmentation_images",
+                "--log_group", "mobileones2_s0x2",
+                "--log_project", "lcz",
+                "results", "patch_core",
+                "-b", "mobileones2",
+                "-le", "stages.0",
+                "--target_embed_dimension" , "40",
+                "--anomaly_scorer_num_nn", "1",
+                "sampler", "-p", "0.2",
+                "approx_greedy_coreset",
+                "dataset", "--resize", "519,1372",
+                "-d", "lcz",
+                "mvtec", "./data/MVTec"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}

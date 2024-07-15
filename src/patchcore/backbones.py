@@ -1,5 +1,6 @@
 import timm  # noqa
 import torchvision.models as models  # noqa
+import starnet  # noqa
 
 _BACKBONES = {
     "alexnet": "models.alexnet(pretrained=True)",
@@ -44,6 +45,17 @@ _BACKBONES = {
     "efficientnetv2_m": 'timm.create_model("tf_efficientnetv2_m", pretrained=True)',
     "efficientnetv2_l": 'timm.create_model("tf_efficientnetv2_l", pretrained=True)',
     "efficientnet_b3a": 'timm.create_model("efficientnet_b3a", pretrained=True)',
+    "efficientnet_b4": 'timm.create_model("efficientnet_b4", pretrained=True)',
+    "efficientnet_b0": 'timm.create_model("efficientnet_b0", pretrained=True)',
+    "mobilenetv3": 'timm.create_model("mobilenetv3_large_100", pretrained=True)',
+    "mobilenetv2": 'timm.create_model("mobilenetv2_100", pretrained=True)',
+    "cspresnet": 'timm.create_model("cspresnet50", pretrained=True)',
+    "cspresnext": 'timm.create_model("cspresnext50", pretrained=True)',
+    "cspdarknet": 'timm.create_model("cspdarknet53", pretrained=True)',
+    "starnets2": 'starnet.starnet_s2(pretrained=True)',
+    "starnets4": 'starnet.starnet_s4(pretrained=True)',
+    "mobileones0": 'timm.create_model("hf_hub:timm/mobileone_s0.apple_in1k", pretrained=True)',
+    "mobileones2": 'timm.create_model("hf_hub:timm/mobileone_s2.apple_in1k", pretrained=True)',
 }
 
 

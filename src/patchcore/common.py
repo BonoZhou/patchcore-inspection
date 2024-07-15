@@ -268,8 +268,8 @@ class NetworkFeatureAggregator(torch.nn.Module):
                     network_layer = network_layer.__dict__["_modules"][extract_idx]
             else:
                 network_layer = backbone.__dict__["_modules"][extract_layer]
-            print("network_layer:")
-            print(network_layer)
+            #print("network_layer:")
+            #print(network_layer)
             if isinstance(network_layer, torch.nn.Sequential):
                 self.backbone.hook_handles.append(
                     network_layer[-1].register_forward_hook(forward_hook)

@@ -134,7 +134,7 @@ def run(
                 .max(axis=-1)
                 .reshape(-1, 1, 1, 1)
             )
-            segmentations = (segmentations - min_scores) / (max_scores - min_scores)
+            segmentations = (segmentations - min_scores) / (max_scores - min_scores) * 2
             segmentations = np.mean(segmentations, axis=0)
             
             #segmentations = np.array(aggregator["segmentations"])
@@ -169,7 +169,7 @@ def run(
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
-            threshold = np.percentile(scores[np.logical_not(anomaly_labels)],90)
+            threshold = np.percentile(scores[np.logical_not(anomaly_labels)],80)
             print("threshold",threshold)
             for i in [80,90,95,99]:
                 print(i,"percent threshold:",np.percentile(scores[np.logical_not(anomaly_labels)],i))
@@ -177,7 +177,7 @@ def run(
 
             for i in [80,90,95,99]:
                 print(i,"percent segmentationthreshold:",np.percentile(_segmentationthreshold[np.logical_not(anomaly_labels)],i))
-            segmentationthreshold = np.max(_segmentationthreshold[np.logical_not(anomaly_labels)])
+            segmentationthreshold = np.percentile(_segmentationthreshold[np.logical_not(anomaly_labels)],80)*0.7
             # (Optional) Plot example images.
             if save_segmentation_images:
                 image_paths = [
@@ -325,8 +325,8 @@ def run(
 @click.option("--backbone_names", "-b", type=str, multiple=True, default=["wideresnet50"])
 @click.option("--layers_to_extract_from", "-le", type=str, multiple=True, default=["layer2","layer3"])
 # Parameters for Glue-code (to merge different parts of the pipeline.
-@click.option("--pretrain_embed_dimension", type=int, default=1024)
-@click.option("--target_embed_dimension", type=int, default=1024)
+@click.option("--pretrain_embed_dimension", type=int, default=128)
+@click.option("--target_embed_dimension", type=int, default=128)
 @click.option("--preprocessing", type=click.Choice(["mean", "conv"]), default="mean")
 @click.option("--aggregation", type=click.Choice(["mean", "mlp"]), default="mean")
 # Nearest-Neighbour Anomaly Scorer parameters.

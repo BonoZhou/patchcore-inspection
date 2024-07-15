@@ -238,16 +238,16 @@ class PatchCore(torch.nn.Module):
                 feature_batch_image = feature_batch_image.reshape(batchsize,-1,feature_batch_image.shape[-1]) # 2,-1,1024
                 print("feature_batch_image:",feature_batch_image.shape) # 2,1568,1024
                 print("name:",name)
-                savepath = name[0] + '.pt'
-                torch.save(feature_batch_image,savepath)
+                #savepath = name[0] + '.pt'
+                #torch.save(feature_batch_image,savepath)
                 features.append(feature_batch_image)
-            print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
+            #print("features:",len(features),features[0].shape) # 28 (1, 42082=h/8*w/8, 1024)
         features = np.concatenate(features, axis=0) # 209,784,1024
         self.features = torch.Tensor(features.transpose(1,0,2))
         #print(type(self.featuresampler))
         #sampler
         #features = self.featuresampler._compute_greedy_coreset_indices(torch.Tensor(features).cuda())
-        #print("features:",features.shape) # (28, h/8, w/8, 1024)
+        print("features:",features.shape) # (28, h/8, w/8, 1024)
         
 
 
@@ -368,7 +368,7 @@ class PatchCore(torch.nn.Module):
                     masks_gt.extend(image["mask"].numpy().tolist())
                     pos = image["defectpos"]
                     image = image["image"]
-                    print("imgshape:::",image.shape)
+                    #print("imgshape:::",image.shape)
                 if len(pos)==0:    
                     _scores, _masks = self._predict(image,patch_memory=patch_memory)
                 else:
@@ -394,8 +394,14 @@ class PatchCore(torch.nn.Module):
         return scores, masks, labels_gt, masks_gt
 
 
-    def _predict(self, images,patch_memory=None,startw=0,starth=0,width=-1,height=-1,padding = 8, size = 8):
+    def _predict(self, images,patch_memory=None,startw=0,starth=0,width=-1,height=-1,padding = 8, size = 4):
         """Infer score and mask for a batch of images."""
+        def distance(x,y):
+            return torch.norm(x-y,dim=3)
+            return torch.abs(t1 - t2).sum(3)
+            return torch.abs(t1 - t2).max(3).values
+            return 1 - torch.nn.functional.cosine_similarity(t1, t2, 3)
+
 
         #按块裁切图像
         def _getcoord(starth,startw,width,height):
@@ -474,8 +480,10 @@ class PatchCore(torch.nn.Module):
             #cal time
             start = time.time()
             #features, patch_shapes = self._embed(images, detach=False ,provide_patch_shapes=True)#patch_shape:[[397, 106], [199, 53]]
-            features = self._embed(cropped_image, detach=False,provide_patch_shapes=False)
-            patch_shapes = [[(eh-sh)//size,(ew-sw)//size]]
+            features , patch_shapes= self._embed(cropped_image, detach=False,provide_patch_shapes=True)
+            #print("features:",features.shape)
+            
+            #patch_shapes = [[(eh-sh)//size,(ew-sw)//size]]
             #print("patch_shapes:",patch_shapes)
             self.time['embed'].append(time.time()-start)
 
@@ -499,11 +507,11 @@ class PatchCore(torch.nn.Module):
             #patch_memory = patch_memory.expand(-1,-1,features.shape[2],-1) # -1,209,2,1024
             #print(patch_memory.shape[0])
             if len(index) < patch_memory.shape[0]:
-                distances = torch.norm(torch.index_select(features,0,image_index)-torch.index_select(patch_memory,0,index),dim=3)
+                distances = distance(torch.index_select(features,0,image_index),torch.index_select(patch_memory,0,index))
             else:
                 
-                distances = torch.norm(features-patch_memory,dim=3)
-                print("*******distance:",distances.shape)
+                distances = distance(features,patch_memory)
+                #print("*******distance:",distances.shape)
             min_distances,_ = torch.min(distances,dim=1)
             self.time['predict_process'].append(time.time()-start)
 
@@ -535,7 +543,7 @@ class PatchCore(torch.nn.Module):
             image_scores = image_scores.reshape(*image_scores.shape[:2], -1)
             #print(image_scores.shape)
             image_scores = self.patch_maker.score(image_scores)
-            #print(image_scores)
+            
             patch_scores = self.patch_maker.unpatch_scores(
                 patch_scores, batchsize=batchsize
             )
@@ -544,7 +552,7 @@ class PatchCore(torch.nn.Module):
             patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])
 
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores,image_shape=(h,w),padding=(sh,sw,eh,ew))
-            #print(masks[0].shape)
+            #print("maskshape:",masks[0].shape)
             self.time['predict_postprocessing'].append(time.time()-start)
         return [score for score in image_scores], [mask for mask in masks]
 
