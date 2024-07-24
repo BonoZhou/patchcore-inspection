@@ -78,7 +78,7 @@ def run(
 
         with device_context:
             torch.cuda.empty_cache()
-            #imagesize = dataloaders["training"].dataset.imagesize
+            imagesize = dataloaders["training"].dataset.imagesize
             sampler = methods["get_sampler"](
                 device,
             )
@@ -124,7 +124,7 @@ def run(
             scores = np.mean(scores, axis=0)
             '''
             segmentations = np.array(aggregator["segmentations"])
-            patchcore.utils.getscoredistribution(segmentations,run_save_path,distance_method=PatchCore.distance_method)
+            segmentationthreshold = patchcore.utils.getscoredistribution(segmentations,run_save_path,distance_method=PatchCore.distance_method)
             min_scores = (
                 segmentations.reshape(len(segmentations), -1)
                 .min(axis=-1)
@@ -173,13 +173,13 @@ def run(
             ]
             threshold = np.percentile(scores[np.logical_not(anomaly_labels)],80)
             print("threshold",threshold)
-            for i in [80,90,95,99]:
-                print(i,"percent threshold:",np.percentile(scores[np.logical_not(anomaly_labels)],i))
+            #for i in [80,90,95,99]:
+            #    print(i,"percent threshold:",np.percentile(scores[np.logical_not(anomaly_labels)],i))
             _segmentationthreshold = np.array(_segmentationthreshold)
 
-            for i in [80,90,95,99]:
-                print(i,"percent segmentationthreshold:",np.percentile(_segmentationthreshold[np.logical_not(anomaly_labels)],i))
-            segmentationthreshold = np.percentile(_segmentationthreshold[np.logical_not(anomaly_labels)],80)*0.7
+            #for i in [80,90,95,99]:
+            #    print(i,"percent segmentationthreshold:",np.percentile(_segmentationthreshold[np.logical_not(anomaly_labels)],i))
+            segmentationthreshold = ((segmentationthreshold - min_scores) / (max_scores - min_scores)).reshape(-1)
             # (Optional) Plot example images.
             if save_segmentation_images:
                 image_paths = [

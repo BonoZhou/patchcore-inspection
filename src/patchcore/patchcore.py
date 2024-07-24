@@ -51,7 +51,7 @@ class PatchCore(torch.nn.Module):
         feature_aggregator = patchcore.common.NetworkFeatureAggregator(
             self.backbone, self.layers_to_extract_from, self.device
         )
-        torch.save(self.backbone, './backbone1.pth')
+        #torch.save(self.backbone, './backbone1.pth')
         feature_dimensions = feature_aggregator.feature_dimensions(input_shape)
         # print(input_shape,feature_dimensions)
         self.forward_modules["feature_aggregator"] = feature_aggregator
@@ -59,7 +59,7 @@ class PatchCore(torch.nn.Module):
         preprocessing = patchcore.common.Preprocessing(
             feature_dimensions, pretrain_embed_dimension
         )
-        torch.save(self.backbone, 'backbone2.pth')
+        #torch.save(self.backbone, 'backbone2.pth')
         self.forward_modules["preprocessing"] = preprocessing
 
         self.target_embed_dimension = target_embed_dimension
@@ -78,7 +78,7 @@ class PatchCore(torch.nn.Module):
         self.anomaly_segmentor = patchcore.common.RescaleSegmentor(
             device=self.device, target_size=input_shape[-2:]
         )
-        torch.save(self.backbone, 'backbone3.pth')
+        #torch.save(self.backbone, 'backbone3.pth')
 
         self.featuresampler = featuresampler
         self.features = None
@@ -237,8 +237,8 @@ class PatchCore(torch.nn.Module):
                 feature_batch_image = np.array(_image_to_features(image))
                 
                 feature_batch_image = feature_batch_image.reshape(batchsize,-1,feature_batch_image.shape[-1]) # 2,-1,1024
-                print("feature_batch_image:",feature_batch_image.shape) # 2,1568,1024
-                print("name:",name)
+                #print("feature_batch_image:",feature_batch_image.shape) # 2,1568,1024
+                #print("name:",name)
                 #savepath = name[0] + '.pt'
                 #torch.save(feature_batch_image,savepath)
                 features.append(feature_batch_image)
@@ -248,7 +248,7 @@ class PatchCore(torch.nn.Module):
         #print(type(self.featuresampler))
         #sampler
         #features = self.featuresampler._compute_greedy_coreset_indices(torch.Tensor(features).cuda())
-        print("features:",features.shape) # (28, h/8, w/8, 1024)
+        #print("features:",features.shape) # (28, h/8, w/8, 1024)
         
 
 
@@ -389,8 +389,8 @@ class PatchCore(torch.nn.Module):
                     masks.append(mask)
             #print time
             print('inference time:',np.mean(inft),'fps:',1/np.mean(inft))
-            for i in self.time:
-                print(i,":",np.sum(self.time[i]))
+            #for i in self.time:
+            #    print(i,":",np.sum(self.time[i]))
 
         return scores, masks, labels_gt, masks_gt
 
@@ -400,7 +400,7 @@ class PatchCore(torch.nn.Module):
         def distance(x,y):
             if self.distance_method == "norm":
                 return torch.norm(x-y,dim=3)
-            elif self.distance_method == "cosine":
+            elif self.distance_method == "cos":
                 return 1 - torch.nn.functional.cosine_similarity(x, y, 3)
             elif self.distance_method == "sum":
                 return torch.abs(x - y).sum(3)

@@ -329,4 +329,4 @@ def getscoredistribution(segmentations, savefolder,distance_method = 'norm'):
     plt.title('分数分布')
     fig.tight_layout()  # 调整布局以防止标签重叠
     plt.savefig(savefolder + f'\\score_distribution_' + distance_method + '.png')
-    return
+    return threshold
